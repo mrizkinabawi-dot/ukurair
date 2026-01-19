@@ -60,10 +60,12 @@ const App = () => {
     const unsubscribe = onValue(dashboardRef, (snapshot) => {
       const val = snapshot.val();
       if (val) {
-        const list = Object.keys(val).map(key => ({
-          id: key,
-          ...val[key]
-        }));
+        const list = Object.keys(val)
+          .map(key => ({
+            id: key,
+            ...val[key]
+          }))
+          .filter(d => d.name); // Hanya tampilkan yang punya nama (menghindari ghost devices)
         setData(list);
       } else {
         setData([]);
@@ -305,11 +307,11 @@ const App = () => {
               <div style={{ flex: 1 }}>
                 <div className="admin-table-container">
                   <table>
-                    <thead><tr><th>ID</th><th>Wilayah</th><th>Secret Token</th><th>Aksi</th></tr></thead>
+                    <thead><tr><th>ID Alat (Arduino)</th><th>Wilayah</th><th>Secret Token</th><th>Aksi</th></tr></thead>
                     <tbody>
                       {devices.map(d => (
                         <tr key={d.id}>
-                          <td style={{ fontSize: '0.7rem', opacity: 0.5 }}>{d.id}</td>
+                          <td style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent)' }}>{d.id}</td>
                           <td style={{ fontWeight: 600 }}>{d.name}</td>
                           <td>
                             <code style={{ background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--accent)' }}>

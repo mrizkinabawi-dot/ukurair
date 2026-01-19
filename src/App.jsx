@@ -41,6 +41,7 @@ const App = () => {
 
   // Form states
   const [newName, setNewName] = useState('');
+  const [newSecretKey, setNewSecretKey] = useState('');
   const [newGlobalKey, setNewGlobalKey] = useState('');
 
   // 1. Firebase Auth Listener
@@ -138,29 +139,38 @@ const App = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    setView('dashboard');
-  };
-
   const handleAddDevice = async (e) => {
     e.preventDefault();
+    if (!newSecretKey) return alert('Silakan isi atau generate token!');
     try {
       const devicesRef = ref(db, 'devices');
       const newDevRef = push(devicesRef);
       await set(newDevRef, {
         name: newName,
+        secret_key: newSecretKey,
         created_at: new Date().toISOString()
       });
       // Also init dashboard
       await set(ref(db, `dashboard/${newDevRef.key}`), {
         name: newName,
+        secret_key: newSecretKey,
         water_level: 0,
         status: 'AMAN',
         created_at: new Date().toISOString()
       });
       setNewName('');
+      setNewSecretKey('');
     } catch (e) { console.error(e); }
+  };
+
+  const generateToken = () => {
+    const key = Math.random().toString(36).substring(2, 10).toUpperCase();
+    setNewSecretKey(key);
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setView('dashboard');
   };
 
   const handleDeleteDevice = async (id) => {
@@ -169,6 +179,16 @@ const App = () => {
       await remove(ref(db, `devices/${id}`));
       await remove(ref(db, `dashboard/${id}`));
       await remove(ref(db, `measurements/${id}`));
+    } catch (e) { console.error(e); }
+  };
+
+  const handleResetToken = async (id) => {
+    if (!confirm('Ganti token rahasia untuk alat ini? ESP32 harus diupdate dengan token baru.')) return;
+    try {
+      const newKey = Math.random().toString(36).substring(2, 10).toUpperCase();
+      await set(ref(db, `devices/${id}/secret_key`), newKey);
+      await set(ref(db, `dashboard/${id}/secret_key`), newKey);
+      alert('Token baru: ' + newKey);
     } catch (e) { console.error(e); }
   };
 
@@ -285,13 +305,21 @@ const App = () => {
               <div style={{ flex: 1 }}>
                 <div className="admin-table-container">
                   <table>
-                    <thead><tr><th>ID</th><th>Wilayah</th><th>Aksi</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Wilayah</th><th>Secret Token</th><th>Aksi</th></tr></thead>
                     <tbody>
                       {devices.map(d => (
                         <tr key={d.id}>
                           <td style={{ fontSize: '0.7rem', opacity: 0.5 }}>{d.id}</td>
                           <td style={{ fontWeight: 600 }}>{d.name}</td>
-                          <td><button className="btn btn-danger" onClick={() => handleDeleteDevice(d.id)}>Hapus</button></td>
+                          <td>
+                            <code style={{ background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--accent)' }}>
+                              {d.secret_key || 'NO_TOKEN'}
+                            </code>
+                          </td>
+                          <td style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button className="btn" style={{ border: '1px solid var(--border)', fontSize: '0.7rem' }} onClick={() => handleResetToken(d.id)}>Reset</button>
+                            <button className="btn btn-danger" onClick={() => handleDeleteDevice(d.id)}>Hapus</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -310,8 +338,23 @@ const App = () => {
                 <div className="metric-card">
                   <h4 style={{ marginBottom: '1rem' }}>Tambah Alat</h4>
                   <form onSubmit={handleAddDevice}>
-                    <div className="form-group"><label>Nama Wilayah</label><input value={newName} onChange={e => setNewName(e.target.value)} required /></div>
-                    <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Daftar</button>
+                    <div className="form-group">
+                      <label>Nama Wilayah</label>
+                      <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Contoh: Pintu Air B" required />
+                    </div>
+                    <div className="form-group">
+                      <label>Secret Token (API Key)</label>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <input
+                          value={newSecretKey}
+                          onChange={e => setNewSecretKey(e.target.value)}
+                          placeholder="8 Karakter"
+                          required
+                        />
+                        <button type="button" onClick={generateToken} className="btn" style={{ padding: '0 10px', fontSize: '0.7rem', border: '1px solid var(--accent)', color: 'var(--accent)' }}>GEN</button>
+                      </div>
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Daftar Alat Baru</button>
                   </form>
                 </div>
               </div>

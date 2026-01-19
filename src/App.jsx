@@ -60,28 +60,32 @@ const App = () => {
     const devicesRef = ref(db, 'devices');
 
     // Listen to both to ensure names are always available
-    const unsubscribe = onValue(dashboardRef, (snapshot) => {
+    const unsubscribe = onValue(dashboardRef, async (snapshot) => {
       const dashVal = snapshot.val() || {};
 
-      // Get device names for fallback
-      get(devicesRef).then((deviceSnap) => {
+      try {
+        const deviceSnap = await get(devicesRef);
         const devVal = deviceSnap.val() || {};
 
         const list = Object.keys(dashVal)
           .map(key => {
             const dashData = dashVal[key];
             const devData = devVal[key] || {};
+
+            // Prioritas: 
+            // 1. created_at dari dashboard (data terakhir masuk dari ESP32)
+            // 2. Jika tidak ada, pakai created_at pendaftaran (biar tidak kosong)
             return {
               id: key,
               ...dashData,
-              name: dashData.name || devData.name, // Priority to dash name, fallback to device name
-              created_at: dashData.created_at || devData.created_at // Restore timestamp
+              name: dashData.name || devData.name,
+              created_at: dashData.created_at || devData.created_at || Date.now()
             };
           })
-          .filter(d => d.name); // Tetap filter ghost devices yang benar-benar tidak ada namanya di manapun
+          .filter(d => d.name);
 
         setData(list);
-      });
+      } catch (e) { console.error(e); }
     });
     return () => unsubscribe();
   }, []);
@@ -290,7 +294,9 @@ const App = () => {
                   </div>
                   <div className="card-value">{device.water_level || 0} <span style={{ fontSize: '1rem' }}>cm</span></div>
                   <div style={{ margin: '1rem 0' }}><StatusBadge status={device.status} /></div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Update: {device.created_at ? new Date(device.created_at).toLocaleTimeString() : '-'}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                    Update: {device.created_at ? new Date(device.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}
+                  </div>
                 </div>
               ))}
             </div>

@@ -57,19 +57,31 @@ const App = () => {
   // 2. Real-time Dashboard Listener
   useEffect(() => {
     const dashboardRef = ref(db, 'dashboard');
+    const devicesRef = ref(db, 'devices');
+
+    // Listen to both to ensure names are always available
     const unsubscribe = onValue(dashboardRef, (snapshot) => {
-      const val = snapshot.val();
-      if (val) {
-        const list = Object.keys(val)
-          .map(key => ({
-            id: key,
-            ...val[key]
-          }))
-          .filter(d => d.name); // Hanya tampilkan yang punya nama (menghindari ghost devices)
+      const dashVal = snapshot.val() || {};
+
+      // Get device names for fallback
+      get(devicesRef).then((deviceSnap) => {
+        const devVal = deviceSnap.val() || {};
+
+        const list = Object.keys(dashVal)
+          .map(key => {
+            const dashData = dashVal[key];
+            const devData = devVal[key] || {};
+            return {
+              id: key,
+              ...dashData,
+              name: dashData.name || devData.name, // Priority to dash name, fallback to device name
+              created_at: dashData.created_at || devData.created_at // Restore timestamp
+            };
+          })
+          .filter(d => d.name); // Tetap filter ghost devices yang benar-benar tidak ada namanya di manapun
+
         setData(list);
-      } else {
-        setData([]);
-      }
+      });
     });
     return () => unsubscribe();
   }, []);
@@ -110,10 +122,24 @@ const App = () => {
     onValue(historyRef, (snapshot) => {
       const val = snapshot.val();
       if (val) {
-        const list = Object.keys(val).map(key => ({
-          ...val[key],
-          time: new Date(val[key].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        })).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const list = Object.keys(val).map(key => {
+          const item = val[key];
+          const rawTs = item.created_at;
+          let date;
+
+          if (!rawTs) {
+            // Fallback: If no timestamp, use current time (avoids Invalid Date)
+            date = new Date();
+          } else {
+            date = new Date(rawTs);
+          }
+
+          return {
+            ...item,
+            time: date.getTime() ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-',
+            sortTs: date.getTime() || 0
+          };
+        }).sort((a, b) => a.sortTs - b.sortTs);
 
         setChartData(prev => ({ ...prev, [deviceId]: list }));
       }

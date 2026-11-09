@@ -13,7 +13,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { ref, onValue, set, remove } from 'firebase/database';
+import { ref, onValue, set, remove, get } from 'firebase/database';
 import { db } from './firebase';
 import {
   Layers, X, Save, Eye, EyeOff, ChevronDown, ChevronUp,
@@ -433,36 +433,63 @@ export const EditRangeModal = ({
     setIsDrawingRoad(true);
   };
 
-  // Handler menghapus / mengosongkan zona yang sedang aktif
-  const handleClearCurrentZone = () => {
-    if (activeTab === 1) {
-      // Zona 2: Hapus titik jalan
-      if (window.confirm('Hapus rute garis jalan pada Zona 2?')) {
-        updateCurrentSubZone({ road_points: [], enabled: false });
-        setActiveDrawPoints([]);
-      }
-    } else {
-      // Zona 1 atau 3: Nonaktifkan
-      const zoneName = activeTab === 0 ? 'Zona 1 (Tiang)' : 'Zona 3 (Hilir)';
-      if (window.confirm(`Hapus / Sembunyikan lingkaran ${zoneName} dari peta?`)) {
-        updateCurrentSubZone({ enabled: false });
-      }
+  // Handler menghapus / mengosongkan zona yang sedang aktif (LANGSUNG SIMPAN KE FIREBASE)
+  const handleClearCurrentZone = async () => {
+    const zoneName = activeTab === 0 ? 'Zona 1 (Tiang)' : activeTab === 1 ? 'Zona 2 (Jalan)' : 'Zona 3 (Hilir)';
+    if (!window.confirm(`Hapus / Hilangkan ${zoneName} dari peta?\n\nZona ini akan langsung dinonaktifkan dan hilang dari peta.`)) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const nextSubZones = [...subZones];
+      nextSubZones[activeTab] = {
+        ...nextSubZones[activeTab],
+        enabled: false,
+        road_points: []
+      };
+      setSubZones(nextSubZones);
+      if (activeTab === 1) setActiveDrawPoints([]);
+
+      const center = [device.lat || 1.128, device.lng || 104.053];
+      const payload = {
+        id: currentZone?.id || `zone-${device.id}`,
+        device_id: device.id,
+        name: device.name || 'Titik Pantau',
+        lat: device.lat || 1.128,
+        lng: device.lng || 104.053,
+        center: center,
+        sub_zones: nextSubZones,
+        radius_meter: nextSubZones[0]?.radius_meter || 80,
+        color: nextSubZones[0]?.color || '#22c55e',
+        notes: nextSubZones[1]?.notes || '',
+        is_demo: false,
+        updated_at: Date.now()
+      };
+
+      await onSaveZone(payload);
+      alert(`✅ ${zoneName} berhasil dihapus dari peta!`);
+    } catch (err) {
+      alert('Gagal menghapus zona: ' + err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Handler hapus SEMUA zona titik pantau ini
+  // Handler hapus SEMUA zona titik pantau ini (LANGSUNG BERSIHKAN DI FIREBASE)
   const handleDeleteAllZones = async () => {
-    if (!window.confirm(`Yakin ingin MENGHAPUS SEMUA ZONA (lingkaran & jalan) pada "${device.name}"?\n\nSemua zona pada titik ini akan dibersihkan dari peta.`)) {
+    if (!window.confirm(`Yakin ingin MENGHAPUS SEMUA ZONA (lingkaran & jalan) pada "${device.name}"?\n\nSemua zona pada titik ini akan langsung dibersihkan total dari peta.`)) {
       return;
     }
     setSaving(true);
     try {
       if (typeof onDeleteZone === 'function') {
         const zoneId = currentZone?.id || `zone-${device.id}`;
-        await onDeleteZone(zoneId);
+        await onDeleteZone(device.id, zoneId);
       }
       setIsDrawingRoad(false);
       onClose();
+      alert('✅ Semua zona pada titik ini berhasil dibersihkan dari peta!');
     } catch (err) {
       alert('Gagal menghapus zona: ' + err.message);
     } finally {
@@ -1056,8 +1083,32 @@ export const useFloodZones = () => {
     await set(ref(db, `flood_zones/${zoneId}`), zoneData);
   };
 
-  const deleteZone = async (zoneId) => {
-    await remove(ref(db, `flood_zones/${zoneId}`));
+  const deleteZone = async (deviceId, zoneId) => {
+    try {
+      if (zoneId) {
+        await remove(ref(db, `flood_zones/${zoneId}`));
+      }
+      if (deviceId) {
+        await remove(ref(db, `flood_zones/zone-${deviceId}`));
+      }
+      // Scan untuk memastikan semua record yang terkait device ini bersih
+      const snap = await get(ref(db, 'flood_zones'));
+      const val = snap.val();
+      if (val) {
+        for (const [k, v] of Object.entries(val)) {
+          if (
+            k === zoneId ||
+            k === `zone-${deviceId}` ||
+            v.device_id === deviceId ||
+            (v.id && String(v.id).includes(deviceId))
+          ) {
+            await remove(ref(db, `flood_zones/${k}`));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal deleteZone:', err);
+    }
   };
 
   return { zones, loadingZones, saveZone, deleteZone };

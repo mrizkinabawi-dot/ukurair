@@ -9,7 +9,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine
 } from 'recharts';
 import {
-  Activity, Database, AlertTriangle, Shield, Settings, LogOut, ChevronRight, BarChart3, Map, LayoutDashboard, Radio, RefreshCcw, ArrowLeft, ArrowRight, Home, Menu, Search, X, Bookmark, Clock, LogIn, User, MinusCircle, Download, Wifi, Cpu, Battery, BatteryCharging, Sun, CloudRain, Sparkles, Bot, Bell, Send, Smartphone, MessageSquare, Check, Share2, Mail, Camera, MapPin, Navigation, Maximize2, Minimize2, Eye, EyeOff, Copy, Edit3, Save, ExternalLink
+  Activity, Database, AlertTriangle, Shield, Settings, LogOut, ChevronRight, BarChart3, Map, LayoutDashboard, Radio, RefreshCcw, ArrowLeft, ArrowRight, Home, Menu, Search, X, Bookmark, Clock, LogIn, User, MinusCircle, Download, Wifi, Cpu, Battery, BatteryCharging, Sun, CloudRain, Sparkles, Bot, Bell, Send, Smartphone, MessageSquare, Check, Share2, Mail, Camera, MapPin, Navigation, Maximize2, Minimize2, Eye, EyeOff, Copy, Edit3, Save, ExternalLink, Sliders
 } from 'lucide-react';
 import { auth, db } from './firebase';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';

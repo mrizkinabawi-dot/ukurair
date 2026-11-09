@@ -5957,7 +5957,7 @@ const App = () => {
                             </div>
 
                             {/* Tombol pintas cepat cari berdasarkan Nama Wilayah */}
-                            {newName.trim() && !addressSearchQuery && (
+                            {Boolean(newName.trim()) && !addressSearchQuery && (
                               <div style={{ marginTop: '5px' }}>
                                 <button
                                   type="button"
@@ -5978,7 +5978,7 @@ const App = () => {
                                     gap: '4px'
                                   }}
                                 >
-                                  <Search size={11} /> Cari nama wilayah "{newName}" di peta
+                                  <Search size={11} /> <span>Cari nama wilayah "{newName}" di peta</span>
                                 </button>
                               </div>
                             )}
@@ -6040,7 +6040,7 @@ const App = () => {
                           </div>
 
                           {/* Notifikasi Label Lokasi Terpilih / Koreksi Manual */}
-                          {selectedAddressLabel && (
+                          {Boolean(selectedAddressLabel) && (
                             <div style={{ fontSize: '0.72rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '4px 8px', borderRadius: '5px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <Check size={13} style={{ flexShrink: 0 }} />
                               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedAddressLabel}</span>
@@ -6112,10 +6112,12 @@ const App = () => {
                               >
                                 <Popup>
                                   <div style={{ fontSize: '0.78rem', color: '#0f172a' }}>
-                                    <b>🎯 Titik Dipilih di Peta</b><br />
-                                    Lat: {newLat}<br />
-                                    Lng: {newLng}<br />
-                                    <span style={{ fontSize: '0.68rem', color: '#64748b' }}>Gunakan tombol sinkron di bawah peta untuk menerapkan ke alat aktif, atau simpan sebagai alat baru.</span>
+                                    <div style={{ fontWeight: 700, marginBottom: '2px' }}>🎯 Titik Dipilih di Peta</div>
+                                    <div>Lat: <span>{newLat}</span></div>
+                                    <div>Lng: <span>{newLng}</span></div>
+                                    <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: '4px' }}>
+                                      Gunakan tombol sinkron di bawah peta untuk menerapkan ke alat aktif, atau simpan sebagai alat baru.
+                                    </div>
                                   </div>
                                 </Popup>
                               </Marker>

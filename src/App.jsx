@@ -3698,6 +3698,7 @@ const App = () => {
             setIsDrawingRoad(false);
           }}
           onSaveZone={saveZone}
+          onDeleteZone={deleteZone}
           isDrawingRoad={isDrawingRoad}
           setIsDrawingRoad={setIsDrawingRoad}
           activeDrawPoints={activeDrawPoints}

@@ -5,6 +5,7 @@
  * - Zona 1: Normal mengikuti tinggi tiang (lingkaran radius sekitar sensor)
  * - Zona 2: Mengikuti kontur jalan (jalur garis tebal yang bisa diklik di peta)
  * - Zona 3: Mengikuti kontur area / cekungan hilir / pemukiman (poligon atau area)
+ * - Fitur Hapus / Matikan Zona (per zona atau hapus semua sekaligus)
  * - Klik di peta langsung untuk menandai jalan ke jalan!
  * - Slider simulasi HANYA visual, tidak mengubah data sensor IoT asli
  */
@@ -17,7 +18,7 @@ import { db } from './firebase';
 import {
   Layers, X, Save, Eye, EyeOff, ChevronDown, ChevronUp,
   Check, CircleDot, MapPin, Undo2, RotateCcw, Navigation,
-  Sliders, Plus, Trash2, Edit3, Compass
+  Sliders, Plus, Trash2, Edit3, AlertTriangle, Power
 } from 'lucide-react';
 
 // ─── Pilihan Warna Cepat ──────────────────────────────────────────────────
@@ -62,6 +63,8 @@ export const FloodZoneLayer = ({
 
     // Helper untuk render satu zona objek
     const renderSingleZone = (z, isPreview = false) => {
+      if (z.enabled === false && !isPreview) return; // Jangan render jika dinonaktifkan / dihapus
+
       const zoneColor = z.color || '#38bdf8';
       const zoneType = z.type || 'circle';
 
@@ -116,7 +119,7 @@ export const FloodZoneLayer = ({
 
         // Marker kecil pada titik-titik jalan jika sedang preview
         if (isPreview) {
-          z.road_points.forEach((pt, idx) => {
+          z.road_points.forEach((pt) => {
             const dot = L.circleMarker(pt, {
               radius: 5,
               color: '#ffffff',
@@ -154,7 +157,7 @@ export const FloodZoneLayer = ({
         layersRef.current.push(poly);
       } 
       // 3. Tipe Lingkaran Radius (Zona Normal Tiang Sensor)
-      else {
+      else if (zoneType === 'circle') {
         const center = z.center || (z.lat && z.lng ? [z.lat, z.lng] : null);
         if (!center) return;
         const radius = Number(z.radius_meter) || 80;
@@ -199,7 +202,7 @@ export const FloodZoneLayer = ({
             });
           }
         });
-      } else {
+      } else if (zoneRecord.enabled !== false) {
         renderSingleZone(zoneRecord);
       }
     });
@@ -350,6 +353,7 @@ export const EditRangeModal = ({
   currentZone,
   onClose,
   onSaveZone,
+  onDeleteZone,
   isDrawingRoad,
   setIsDrawingRoad,
   activeDrawPoints,
@@ -370,7 +374,7 @@ export const EditRangeModal = ({
         name: 'Zona 1 (Normal / Tiang Sensor)',
         type: 'circle',
         radius_meter: currentZone?.radius_meter || 80,
-        color: '#22c55e',
+        color: '#a855f7',
         notes: 'Lokasi normal mengikuti tinggi tiang sensor alat.',
         center: center,
         enabled: true,
@@ -382,7 +386,6 @@ export const EditRangeModal = ({
         road_width: 18,
         color: '#facc15',
         notes: 'Mengikuti ruas jalan raya & kelokan kontur jalan.',
-        // Titik awal contoh jalan jika baru
         road_points: [
           [center[0] - 0.0012, center[1] - 0.0015],
           center,
@@ -398,7 +401,7 @@ export const EditRangeModal = ({
         color: '#f97316',
         notes: 'Area cekungan hilir / pemukiman di sekitar.',
         center: [center[0] + 0.001, center[1] + 0.001],
-        enabled: true,
+        enabled: false, // Default dinonaktifkan agar tidak muncul lingkaran ganda jika belum diinginkan
       }
     ];
   };
@@ -419,7 +422,7 @@ export const EditRangeModal = ({
   // Sinkronisasi poin ketika user selesai menandai jalan di peta
   useEffect(() => {
     if (!isDrawingRoad && activeDrawPoints && activeDrawPoints.length > 0) {
-      updateCurrentSubZone({ road_points: activeDrawPoints });
+      updateCurrentSubZone({ road_points: activeDrawPoints, enabled: true });
     }
   }, [isDrawingRoad]);
 
@@ -428,6 +431,43 @@ export const EditRangeModal = ({
     const existingPoints = currentSubZone.road_points || [];
     setActiveDrawPoints(existingPoints.length > 0 ? existingPoints : [[device.lat || 1.128, device.lng || 104.053]]);
     setIsDrawingRoad(true);
+  };
+
+  // Handler menghapus / mengosongkan zona yang sedang aktif
+  const handleClearCurrentZone = () => {
+    if (activeTab === 1) {
+      // Zona 2: Hapus titik jalan
+      if (window.confirm('Hapus rute garis jalan pada Zona 2?')) {
+        updateCurrentSubZone({ road_points: [], enabled: false });
+        setActiveDrawPoints([]);
+      }
+    } else {
+      // Zona 1 atau 3: Nonaktifkan
+      const zoneName = activeTab === 0 ? 'Zona 1 (Tiang)' : 'Zona 3 (Hilir)';
+      if (window.confirm(`Hapus / Sembunyikan lingkaran ${zoneName} dari peta?`)) {
+        updateCurrentSubZone({ enabled: false });
+      }
+    }
+  };
+
+  // Handler hapus SEMUA zona titik pantau ini
+  const handleDeleteAllZones = async () => {
+    if (!window.confirm(`Yakin ingin MENGHAPUS SEMUA ZONA (lingkaran & jalan) pada "${device.name}"?\n\nSemua zona pada titik ini akan dibersihkan dari peta.`)) {
+      return;
+    }
+    setSaving(true);
+    try {
+      if (typeof onDeleteZone === 'function') {
+        const zoneId = currentZone?.id || `zone-${device.id}`;
+        await onDeleteZone(zoneId);
+      }
+      setIsDrawingRoad(false);
+      onClose();
+    } catch (err) {
+      alert('Gagal menghapus zona: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Handler simpan seluruh zona ke Firebase
@@ -583,7 +623,7 @@ export const EditRangeModal = ({
         border: '1px solid #334155',
         borderRadius: '16px',
         width: '100%',
-        maxWidth: '460px',
+        maxWidth: '470px',
         maxHeight: '92vh',
         boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
         color: '#f8fafc',
@@ -625,48 +665,88 @@ export const EditRangeModal = ({
             { id: 0, title: 'Zona 1 (Tiang)', icon: '⭕', desc: 'Tinggi Tiang' },
             { id: 1, title: 'Zona 2 (Jalan)', icon: '🛣️', desc: 'Kontur Jalan' },
             { id: 2, title: 'Zona 3 (Hilir)', icon: '📐', desc: 'Area / Hilir' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '6px 4px',
-                borderRadius: '8px',
-                border: activeTab === tab.id ? '2px solid #38bdf8' : '1px solid #334155',
-                background: activeTab === tab.id ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.5)',
-                color: activeTab === tab.id ? '#ffffff' : '#94a3b8',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.15s'
-              }}
-            >
-              <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>
-                {tab.icon} {tab.title}
-              </div>
-              <div style={{ fontSize: '0.62rem', color: activeTab === tab.id ? '#38bdf8' : '#64748b' }}>
-                {tab.desc}
-              </div>
-            </button>
-          ))}
+          ].map(tab => {
+            const isTabEnabled = subZones[tab.id]?.enabled !== false;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '6px 4px',
+                  borderRadius: '8px',
+                  border: activeTab === tab.id ? '2px solid #38bdf8' : '1px solid #334155',
+                  background: activeTab === tab.id ? 'rgba(56,189,248,0.15)' : 'rgba(30,41,59,0.5)',
+                  color: activeTab === tab.id ? '#ffffff' : (isTabEnabled ? '#94a3b8' : '#64748b'),
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'all 0.15s',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ fontSize: '0.78rem', fontWeight: 700 }}>
+                  {tab.icon} {tab.title}
+                </div>
+                <div style={{ fontSize: '0.62rem', color: isTabEnabled ? (activeTab === tab.id ? '#38bdf8' : '#64748b') : '#ef4444' }}>
+                  {isTabEnabled ? tab.desc : '(Nonaktif)'}
+                </div>
+              </button>
+            );
+          })}
         </div>
 
         {/* Isi Form Sesuai Tab Aktif */}
         <div style={{ padding: '14px 18px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {/* Header Info Zona */}
+          {/* Header Info Zona & Tombol Aktif / Hapus Zona Ini */}
           <div style={{ background: '#1e293b', padding: '10px 12px', borderRadius: '10px', border: '1px solid #334155' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Konfigurasi:</span>
-              <span style={{
-                fontSize: '0.68rem',
-                fontWeight: 700,
-                color: currentSubZone.color,
-                background: 'rgba(255,255,255,0.08)',
-                padding: '2px 8px',
-                borderRadius: '6px'
-              }}>
-                {activeTab === 0 ? '⭕ Mengikuti Tiang Sensor' : activeTab === 1 ? '🛣️ Menyesuaikan Kontur Jalan' : '📐 Area Sekitar / Hilir'}
-              </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Status Zona:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Tombol Toggle Aktif/Nonaktif */}
+                <button
+                  type="button"
+                  onClick={() => updateCurrentSubZone({ enabled: currentSubZone.enabled === false ? true : false })}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: currentSubZone.enabled !== false ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+                    color: currentSubZone.enabled !== false ? '#22c55e' : '#ef4444',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <Power size={11} />
+                  {currentSubZone.enabled !== false ? 'Aktif di Peta' : 'Nonaktif (Mati)'}
+                </button>
+
+                {/* Tombol Hapus Zona Ini */}
+                <button
+                  type="button"
+                  onClick={handleClearCurrentZone}
+                  title="Hapus / Kosongkan data zona ini"
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #ef4444',
+                    background: 'rgba(239,68,68,0.1)',
+                    color: '#ef4444',
+                    fontSize: '0.68rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}
+                >
+                  <Trash2 size={11} /> Hapus
+                </button>
+              </div>
             </div>
+
             <input
               type="text"
               value={currentSubZone.name || ''}
@@ -679,7 +759,6 @@ export const EditRangeModal = ({
                 color: '#ffffff',
                 fontWeight: 700,
                 fontSize: '0.88rem',
-                marginTop: '4px',
                 paddingBottom: '2px',
                 outline: 'none'
               }}
@@ -699,24 +778,47 @@ export const EditRangeModal = ({
                     Tersimpan: {currentSubZone.road_points?.length || 0} Titik Jalan
                   </div>
                 </div>
-                <button
-                  onClick={handleStartDrawRoad}
-                  style={{
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    background: '#0284c7',
-                    border: 'none',
-                    color: '#ffffff',
-                    fontWeight: 700,
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <Navigation size={13} /> Klik di Peta
-                </button>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <button
+                    onClick={handleStartDrawRoad}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      background: '#0284c7',
+                      border: 'none',
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Navigation size={13} /> Klik di Peta
+                  </button>
+                  {currentSubZone.road_points && currentSubZone.road_points.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Kosongkan semua titik jalur jalan ini?')) {
+                          updateCurrentSubZone({ road_points: [], enabled: false });
+                          setActiveDrawPoints([]);
+                        }
+                      }}
+                      title="Hapus Garis Jalan"
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: '8px',
+                        background: 'rgba(239,68,68,0.2)',
+                        border: '1px solid #ef4444',
+                        color: '#ef4444',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Slider Lebar Jalan */}
@@ -820,49 +922,77 @@ export const EditRangeModal = ({
           </div>
         </div>
 
-        {/* Footer Tombol Simpan */}
+        {/* Footer Tombol Simpan & Tombol Hapus Semua */}
         <div style={{
           padding: '12px 18px',
           borderTop: '1px solid #1e293b',
           display: 'flex',
+          flexDirection: 'column',
           gap: '8px',
           background: 'rgba(30, 41, 59, 0.4)'
         }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{
+                flex: 1,
+                padding: '9px',
+                borderRadius: '8px',
+                border: 'none',
+                background: '#0284c7',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}
+            >
+              <Save size={15} />
+              {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                padding: '9px 16px',
+                borderRadius: '8px',
+                border: '1px solid #475569',
+                background: 'transparent',
+                color: '#94a3b8',
+                fontSize: '0.82rem',
+                cursor: 'pointer'
+              }}
+            >
+              Batal
+            </button>
+          </div>
+
+          {/* Tombol Hapus Semua Zona Titik Ini */}
           <button
-            onClick={handleSave}
+            type="button"
+            onClick={handleDeleteAllZones}
             disabled={saving}
             style={{
-              flex: 1,
-              padding: '9px',
+              width: '100%',
+              padding: '7px',
               borderRadius: '8px',
-              border: 'none',
-              background: '#0284c7',
-              color: '#ffffff',
-              fontWeight: 700,
-              fontSize: '0.82rem',
+              border: '1px dashed #ef4444',
+              background: 'rgba(239,68,68,0.1)',
+              color: '#fca5a5',
+              fontSize: '0.75rem',
+              fontWeight: 600,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px'
+              gap: '5px'
             }}
           >
-            <Save size={15} />
-            {saving ? 'Menyimpan...' : 'Simpan Semua Zona'}
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '9px 16px',
-              borderRadius: '8px',
-              border: '1px solid #475569',
-              background: 'transparent',
-              color: '#94a3b8',
-              fontSize: '0.82rem',
-              cursor: 'pointer'
-            }}
-          >
-            Batal
+            <Trash2 size={13} color="#ef4444" />
+            Hapus Semua Zona pada Titik Ini (Bersihkan Peta)
           </button>
         </div>
       </div>

@@ -1142,9 +1142,31 @@ const App = () => {
 
   // New states for Google Maps UI
   const [searchQuery, setSearchQuery] = useState('');
+  const [mainMapTarget, setMainMapTarget] = useState(null);
+  const [searchedDestination, setSearchedDestination] = useState(null);
+  const [dashboardPlaceSuggestions, setDashboardPlaceSuggestions] = useState([]);
+  const [isSearchingDashboardPlaces, setIsSearchingDashboardPlaces] = useState(false);
+  const [showDashboardSuggestions, setShowDashboardSuggestions] = useState(false);
+  const mainSearchDebounceRef = useRef(null);
+  const mainSearchContainerRef = useRef(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isHeaderProfileOpen, setIsHeaderProfileOpen] = useState(false);
+
+  // Tutup dropdown sugesti pencarian saat user klik di luar container
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (mainSearchContainerRef.current && !mainSearchContainerRef.current.contains(e.target)) {
+        setShowDashboardSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
 
   const handlePhotoUpload = (e) => {
     const file = e.target.files && e.target.files[0];
@@ -1296,6 +1318,10 @@ const App = () => {
   const handleSelectDevice = (device) => {
     setSelectedDevice(device);
     setView('device-detail');
+
+    const dLat = parseFloat(device.lat) || 1.128;
+    const dLng = parseFloat(device.lng) || 104.053;
+    setMainMapTarget({ lat: dLat, lng: dLng, zoom: 16, _ts: Date.now() });
 
     // Add to recent
     let newRecent = [device.id, ...recentDeviceIds.filter(id => id !== device.id)].slice(0, 10);
@@ -2334,15 +2360,10 @@ const App = () => {
     setNewDeviceId(`${base}-${rand}`);
   };
 
-  // Geocoding: Cari alamat dengan auto-suggest (Nominatim OpenStreetMap + Photon Komoot fallback)
-  const searchAddressGeocode = async (queryText) => {
+  // Geocoding: Helper bersama untuk mencari alamat / tempat (Nominatim OpenStreetMap + Photon Komoot fallback)
+  const fetchGeocodePlaces = async (queryText) => {
     const q = (queryText || '').trim();
-    if (!q || q.length < 2) {
-      setAddressSuggestions([]);
-      setIsSearchingAddress(false);
-      return;
-    }
-    setIsSearchingAddress(true);
+    if (!q || q.length < 2) return [];
 
     try {
       const controller = new AbortController();
@@ -2355,7 +2376,7 @@ const App = () => {
       if (res && res.ok) {
         const json = await res.json();
         if (Array.isArray(json) && json.length > 0) {
-          const formatted = json.map((item, idx) => {
+          return json.map((item, idx) => {
             const rawLat = parseFloat(item.lat);
             const rawLng = parseFloat(item.lon);
             const nameStr = String(item.name || (item.display_name ? item.display_name.split(',')[0] : '') || q || 'Lokasi');
@@ -2368,10 +2389,6 @@ const App = () => {
               type: String(item.type || item.class || 'Alamat')
             };
           });
-          setAddressSuggestions(formatted);
-          setShowAddressSuggestions(true);
-          setIsSearchingAddress(false);
-          return;
         }
       }
     } catch (e) {
@@ -2383,7 +2400,7 @@ const App = () => {
       if (res && res.ok) {
         const json = await res.json();
         if (json && Array.isArray(json.features) && json.features.length > 0) {
-          const formatted = json.features.map((f, i) => {
+          return json.features.map((f, i) => {
             const p = f.properties || {};
             const coords = Array.isArray(f.geometry?.coordinates) ? f.geometry.coordinates : [104.053, 1.128];
             const parts = [p.name, p.street, p.district, p.city, p.state, p.country].filter(Boolean);
@@ -2399,18 +2416,34 @@ const App = () => {
               type: String(p.osm_value || 'Alamat')
             };
           });
-          setAddressSuggestions(formatted);
-          setShowAddressSuggestions(true);
-          setIsSearchingAddress(false);
-          return;
         }
       }
     } catch (e) {
       console.warn('Photon geocode fallback failed:', e);
     }
 
-    setAddressSuggestions([]);
+    return [];
+  };
+
+  // Geocoding Admin: Cari alamat dengan auto-suggest dan auto-center
+  const searchAddressGeocode = async (queryText, autoCenter = false) => {
+    const q = (queryText || '').trim();
+    if (!q || q.length < 2) {
+      setAddressSuggestions([]);
+      setIsSearchingAddress(false);
+      return [];
+    }
+    setIsSearchingAddress(true);
+    const results = await fetchGeocodePlaces(q);
+    setAddressSuggestions(results);
+    setShowAddressSuggestions(results.length > 0);
     setIsSearchingAddress(false);
+    if (autoCenter && results.length > 0) {
+      handleSelectAddressSuggestion(results[0]);
+    } else if (autoCenter && results.length === 0) {
+      alert('Lokasi "' + q + '" tidak ditemukan. Silakan coba nama tempat atau alamat yang lebih spesifik.');
+    }
+    return results;
   };
 
   const handleAddressInputChange = (val) => {
@@ -2422,8 +2455,97 @@ const App = () => {
       return;
     }
     addressDebounceRef.current = setTimeout(() => {
-      searchAddressGeocode(val);
+      searchAddressGeocode(val, false);
     }, 400);
+  };
+
+  // Handler Pencarian di Dashboard Utama (Pencarian Titik Pantau IoT + Pencarian Tempat/Alamat Peta)
+  const handleMainSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    if (!val || val.trim().length === 0) {
+      setDashboardPlaceSuggestions([]);
+      setShowDashboardSuggestions(false);
+      setIsSearchingDashboardPlaces(false);
+      return;
+    }
+
+    setShowDashboardSuggestions(true);
+
+    if (mainSearchDebounceRef.current) clearTimeout(mainSearchDebounceRef.current);
+    if (val.trim().length >= 2) {
+      setIsSearchingDashboardPlaces(true);
+      mainSearchDebounceRef.current = setTimeout(async () => {
+        try {
+          const places = await fetchGeocodePlaces(val);
+          setDashboardPlaceSuggestions(places);
+        } catch (err) {
+          console.warn('Dashboard place search error:', err);
+        } finally {
+          setIsSearchingDashboardPlaces(false);
+        }
+      }, 350);
+    } else {
+      setDashboardPlaceSuggestions([]);
+      setIsSearchingDashboardPlaces(false);
+    }
+  };
+
+  const handleSelectDeviceFromSearch = (device) => {
+    handleSelectDevice(device);
+    const dLat = parseFloat(device.lat) || 1.128;
+    const dLng = parseFloat(device.lng) || 104.053;
+    setMainMapTarget({ lat: dLat, lng: dLng, zoom: 16, _ts: Date.now() });
+    setShowDashboardSuggestions(false);
+  };
+
+  const handleSelectPlaceFromSearch = (place) => {
+    if (!place) return;
+    const safeLat = typeof place.lat === 'number' && !isNaN(place.lat) ? place.lat : parseFloat(place.lat) || 1.128;
+    const safeLng = typeof place.lng === 'number' && !isNaN(place.lng) ? place.lng : parseFloat(place.lng) || 104.053;
+    setSearchedDestination({
+      title: place.title || 'Lokasi Tujuan',
+      fullAddress: place.fullAddress || place.title || '',
+      lat: safeLat,
+      lng: safeLng
+    });
+    setMainMapTarget({ lat: safeLat, lng: safeLng, zoom: 15, _ts: Date.now() });
+    setShowDashboardSuggestions(false);
+    setSearchQuery(place.title || '');
+    if (window.innerWidth <= 768) {
+      setIsNavSidebarOpen(false);
+    }
+  };
+
+  const handleMainSearchKeyDown = async (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const q = (searchQuery || '').trim().toLowerCase();
+      if (!q) return;
+
+      // 1. Cek apakah ada alat yang cocok
+      const matchingDev = (data || []).find(d => d.name && d.name.toLowerCase().includes(q));
+      if (matchingDev) {
+        handleSelectDeviceFromSearch(matchingDev);
+        return;
+      }
+
+      // 2. Cek apakah sudah ada hasil tempat dari sugesti
+      if (dashboardPlaceSuggestions.length > 0) {
+        handleSelectPlaceFromSearch(dashboardPlaceSuggestions[0]);
+        return;
+      }
+
+      // 3. Jika belum, lakukan pencarian instan ke geocoder
+      setIsSearchingDashboardPlaces(true);
+      const places = await fetchGeocodePlaces(q);
+      setIsSearchingDashboardPlaces(false);
+      if (places && places.length > 0) {
+        handleSelectPlaceFromSearch(places[0]);
+      } else {
+        alert('Lokasi atau titik pantau "' + searchQuery + '" tidak ditemukan.');
+      }
+    }
   };
 
   const handleSelectAddressSuggestion = (item) => {
@@ -2996,6 +3118,12 @@ const App = () => {
     filteredData = filteredData.filter(d => d && d.name && String(d.name).toLowerCase().includes(String(searchQuery || '').toLowerCase()));
   }
 
+  const matchingSearchDevices = useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (!q) return [];
+    return (data || []).filter(d => d && d.name && String(d.name).toLowerCase().includes(q));
+  }, [data, searchQuery]);
+
   const renderNotificationSettings = (isModal = false) => (
     <div
       className={isModal ? "" : "metric-card"}
@@ -3341,6 +3469,40 @@ const App = () => {
               url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
               attribution="&copy; Google Maps"
             />
+            <MapFlyController target={mainMapTarget} />
+            <MapResizeHandler expanded={isNavSidebarOpen} />
+
+            {/* Marker Lokasi Tujuan Pencarian Tempat di Peta */}
+            {searchedDestination && (
+              <Marker position={[searchedDestination.lat, searchedDestination.lng]}>
+                <Popup autoPan={false}>
+                  <div style={{ textAlign: 'center', padding: '0.3rem', minWidth: '160px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0284c7', marginBottom: '2px' }}>
+                      📍 {searchedDestination.title}
+                    </div>
+                    <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '4px 0 8px', lineHeight: 1.3 }}>
+                      {searchedDestination.fullAddress}
+                    </p>
+                    <button
+                      onClick={() => setSearchedDestination(null)}
+                      style={{
+                        background: '#fee2e2',
+                        border: '1px solid #fca5a5',
+                        color: '#dc2626',
+                        borderRadius: '4px',
+                        padding: '2px 8px',
+                        fontSize: '0.7rem',
+                        cursor: 'pointer',
+                        fontWeight: 600
+                      }}
+                    >
+                      Hapus Pin Tujuan
+                    </button>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+
             {data.map(device => {
               const lat = device.lat || 1.128;
               const lng = device.lng || 104.053;
@@ -3353,6 +3515,7 @@ const App = () => {
                       setSelectedDevice(device);
                       setView('device-detail');
                       setIsNavSidebarOpen(true);
+                      setMainMapTarget({ lat, lng, zoom: 16, _ts: Date.now() });
                     }
                   }}
                 >
@@ -3540,20 +3703,115 @@ const App = () => {
       {/* Floating Top Bar (Search & Profile/Login Berdampingan Rapi Tanpa Tabrakan) */}
       {(view === 'dashboard' || view === 'device-detail') && (
         <div className="floating-top-bar">
-          <div className="floating-search-bar">
-            <Search size={18} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
-            <input
-              type="text"
-              placeholder="Telusuri lokasi pemantauan..."
-              value={searchQuery}
-              onFocus={() => { if (!isNavSidebarOpen) setIsNavSidebarOpen(true); }}
-              onChange={e => {
-                setSearchQuery(e.target.value);
-                if (e.target.value.trim() && !isNavSidebarOpen) setIsNavSidebarOpen(true);
-              }}
-              style={{ border: 'none', background: 'transparent', color: 'white', padding: '0 8px', width: '100%', minWidth: 0, outline: 'none', fontSize: '0.86rem' }}
-            />
-            {searchQuery && <X size={16} color="var(--text-secondary)" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => setSearchQuery('')} />}
+          <div className="floating-search-container" ref={mainSearchContainerRef}>
+            <div className="floating-search-bar">
+              <Search size={18} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+              <input
+                type="text"
+                placeholder="Telusuri titik pantau atau cari peta tujuan..."
+                value={searchQuery}
+                onFocus={() => {
+                  if (searchQuery.trim().length >= 1) {
+                    setShowDashboardSuggestions(true);
+                  }
+                }}
+                onChange={handleMainSearchChange}
+                onKeyDown={handleMainSearchKeyDown}
+                style={{ border: 'none', background: 'transparent', color: 'white', padding: '0 8px', width: '100%', minWidth: 0, outline: 'none', fontSize: '0.86rem' }}
+              />
+              {isSearchingDashboardPlaces && (
+                <RefreshCcw size={14} className="spin-animate" color="var(--accent)" style={{ marginRight: '6px', flexShrink: 0 }} />
+              )}
+              {searchQuery && (
+                <X
+                  size={16}
+                  color="var(--text-secondary)"
+                  style={{ cursor: 'pointer', flexShrink: 0 }}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setDashboardPlaceSuggestions([]);
+                    setShowDashboardSuggestions(false);
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Dropdown Hasil Pencarian Interaktif (Titik Pantau IoT + Tempat & Alamat di Peta) */}
+            {showDashboardSuggestions && searchQuery.trim().length >= 1 && (
+              <div className="search-suggestions-dropdown">
+                {/* 1. Titik Pantau IoT */}
+                {matchingSearchDevices.length > 0 && (
+                  <div>
+                    <div className="suggestion-section-header">
+                      <Radio size={12} color="var(--accent)" /> Titik Pantau IoT ({matchingSearchDevices.length})
+                    </div>
+                    {matchingSearchDevices.map(dev => {
+                      const eff = getDeviceEffectiveData(dev);
+                      return (
+                        <div
+                          key={`search-dev-${dev.id}`}
+                          className="suggestion-item"
+                          onClick={() => handleSelectDeviceFromSearch(dev)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: eff.isOnline ? '#10b981' : '#ef4444', flexShrink: 0 }} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {dev.name}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                Tinggi: <b style={{ color: eff.isOnline ? 'var(--accent)' : '#ef4444' }}>{eff.water_level} cm</b> • {eff.isOnline ? 'Online' : 'Terputus'}
+                              </div>
+                            </div>
+                          </div>
+                          <Navigation size={14} color="var(--accent)" style={{ flexShrink: 0 }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 2. Tempat & Alamat di Peta */}
+                {dashboardPlaceSuggestions.length > 0 && (
+                  <div>
+                    <div className="suggestion-section-header">
+                      <MapPin size={12} color="#38bdf8" /> Lokasi & Alamat di Peta ({dashboardPlaceSuggestions.length})
+                    </div>
+                    {dashboardPlaceSuggestions.map((place, idx) => (
+                      <div
+                        key={place.id || `place-${idx}`}
+                        className="suggestion-item"
+                        onClick={() => handleSelectPlaceFromSearch(place)}
+                      >
+                        <MapPin size={15} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#f8fafc' }}>
+                            {place.title}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {place.fullAddress}
+                          </div>
+                        </div>
+                        <Navigation size={14} color="#38bdf8" style={{ flexShrink: 0 }} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Jika Belum Ada Hasil */}
+                {matchingSearchDevices.length === 0 && dashboardPlaceSuggestions.length === 0 && !isSearchingDashboardPlaces && (
+                  <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: '0.78rem', color: '#94a3b8' }}>
+                    {searchQuery.trim().length < 2 ? 'Ketik minimal 2 karakter untuk mencari peta...' : 'Lokasi tidak ditemukan. Tekan Enter untuk mencari luas.'}
+                  </div>
+                )}
+
+                {isSearchingDashboardPlaces && (
+                  <div style={{ padding: '8px 16px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                    <RefreshCcw size={12} className="spin-animate" /> Mencari lokasi di peta...
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="floating-profile-container">
@@ -5632,7 +5890,7 @@ const App = () => {
                                   onKeyDown={e => {
                                     if (e.key === 'Enter') {
                                       e.preventDefault();
-                                      searchAddressGeocode(addressSearchQuery);
+                                      searchAddressGeocode(addressSearchQuery, true);
                                     }
                                   }}
                                   placeholder="Ketik alamat lengkap atau tempat (contoh: Nagoya Hill, Asrama Batam, Jl. Sudirman)..."
@@ -5657,7 +5915,7 @@ const App = () => {
                               <button
                                 type="button"
                                 className="btn"
-                                onClick={() => searchAddressGeocode(addressSearchQuery || newName)}
+                                onClick={() => searchAddressGeocode(addressSearchQuery || newName, true)}
                                 disabled={isSearchingAddress}
                                 style={{
                                   padding: '0 12px',
@@ -5688,7 +5946,7 @@ const App = () => {
                                   type="button"
                                   onClick={() => {
                                     setAddressSearchQuery(newName);
-                                    handleAddressInputChange(newName);
+                                    searchAddressGeocode(newName, true);
                                   }}
                                   style={{
                                     background: 'rgba(56, 189, 248, 0.1)',

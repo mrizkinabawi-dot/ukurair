@@ -184,14 +184,14 @@ body {
 }
 
 /* ==========================================================================
-   Login Page & Card Styling (Desktop Base)
+   Login Page & Card Styling (Desktop Base - Wide & Modern Google Auth Style)
    ========================================================================== */
 .login-page-main {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 80px 1.5rem 2rem 1.5rem;
+  padding: 85px 2rem 2rem 2rem;
   box-sizing: border-box;
 }
 
@@ -200,35 +200,43 @@ body {
   justify-content: center;
   align-items: center;
   width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
   position: relative;
 }
 
 .login-card {
   background: #1e293b;
-  border-radius: 24px;
+  border-radius: 28px;
   width: 100%;
-  max-width: 900px;
+  max-width: 880px;
+  min-height: 440px;
   display: flex;
-  gap: 40px;
-  padding: 40px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  flex-direction: row;
+  justify-content: space-between;
+  gap: 48px;
+  padding: 48px 52px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
   border: none;
   box-sizing: border-box;
 }
 
 .login-card-left {
-  flex: 1 1 300px;
+  flex: 1 1 340px;
+  min-width: 280px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
+  text-align: left;
 }
 
 .login-card-right {
-  flex: 1 1 350px;
+  flex: 1 1 400px;
+  min-width: 320px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding-top: 10px;
+  padding-top: 0;
 }
 
 .login-google-logo {
@@ -548,25 +556,7 @@ td {
   gap: 2rem;
 }
 
-/* Login Page */
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: var(--bg-primary);
-}
 
-.login-card {
-  background: var(--bg-secondary);
-  padding: 2.5rem;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  animation: fadeIn 0.5s ease;
-}
 
 /* Metrics */
 .metrics-grid {

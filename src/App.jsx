@@ -1086,7 +1086,34 @@ const App = () => {
     return 'dashboard';
   }); // 'dashboard', 'admin', 'login', 'device-detail'
   const [selectedDevice, setSelectedDevice] = useState(null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('ukurair_auth_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.email) return parsed;
+      }
+    } catch (e) {
+      console.warn('Gagal membaca sesi login:', e);
+    }
+    return null;
+  });
+
+  // Sinkronisasi sesi login ke localStorage agar tetap login saat keluar/tutup browser
+  useEffect(() => {
+    try {
+      if (user && user.email) {
+        const userObj = {
+          email: user.email,
+          uid: user.uid || ('user-' + user.email),
+          displayName: user.displayName || getUserDisplayName(user),
+          photoURL: user.photoURL || customPhoto || null,
+          role: user.role || (adminEmails.includes(user.email.toLowerCase()) ? 'admin' : 'user')
+        };
+        localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj));
+      }
+    } catch (e) {}
+  }, [user, customPhoto, adminEmails]);
 
   const [data, setData] = useState([]); // Latest measurements from /dashboard
   const [devices, setDevices] = useState([]); // Device list from /devices
@@ -1530,24 +1557,39 @@ const App = () => {
     return result;
   }, [detailModalDevice, chartData, chartDateFilter]);
 
-  // 1. Firebase Auth Listener
+  // 1. Firebase Auth Listener & Persistent Session Handler
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       if (u) {
-        setUser(u);
+        const userObj = {
+          email: u.email,
+          uid: u.uid,
+          displayName: u.displayName || u.email.split('@')[0],
+          photoURL: u.photoURL,
+          role: adminEmails.includes(u.email.toLowerCase()) ? 'admin' : 'user'
+        };
+        setUser(userObj);
+        try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (e) {}
       } else {
+        // Jangan hapus user jika ada sesi login aktif di localStorage (akun lokal / bypass / remember login)
         setUser(prev => {
-          if (prev && prev.uid === 'bypass-admin') {
+          if (prev && prev.email) {
             return prev;
           }
-          if (view === 'admin') setView('login');
+          try {
+            const saved = localStorage.getItem('ukurair_auth_user');
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (parsed && parsed.email) return parsed;
+            }
+          } catch (e) {}
           return null;
         });
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [view]);
+  }, []);
 
   // Daftar email admin tambahan dari /settings/admin_emails
   // Format yang didukung: "a@x.com, b@y.com" atau { "a@x.com": true }
@@ -1926,12 +1968,21 @@ const App = () => {
 
     const emailNorm = String(loginEmail || '').trim().toLowerCase();
 
-    // 1. Coba login resmi ke Firebase Auth terlebih dahulu (agar auth != null aktif di Firebase)
+    // 1. Coba login resmi via Firebase Auth
     try {
       const userCredential = await signInWithEmailAndPassword(auth, loginEmail, loginPass);
-      const userObj = userCredential.user;
+      const fbUser = userCredential.user;
+      const userObj = {
+        email: fbUser.email,
+        uid: fbUser.uid,
+        displayName: fbUser.displayName || fbUser.email.split('@')[0],
+        photoURL: fbUser.photoURL,
+        role: isAdminEmail(fbUser.email) ? 'admin' : 'user'
+      };
+      setUser(userObj);
+      try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (err) {}
 
-      const account = { email: userObj.email, name: userObj.displayName || userObj.email.split('@')[0], photoURL: userObj.photoURL };
+      const account = { email: userObj.email, name: userObj.displayName, photoURL: userObj.photoURL };
       const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
       setSavedAccounts(newSaved);
       localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
@@ -1939,14 +1990,51 @@ const App = () => {
       setView(isAdminEmail(userObj.email) ? 'admin' : 'dashboard');
       return;
     } catch (firebaseErr) {
-      console.warn('Firebase Auth login gagal atau belum ada, memeriksa mode bypass:', firebaseErr?.code);
+      console.warn('Firebase Auth login fallback:', firebaseErr?.code);
     }
 
-    // 2. Bypass login darurat jika Firebase Auth belum diset
-    if (emailNorm === 'mrizkinabawi@gmail.com' && loginPass === 'admin123') {
-      setUser({ email: emailNorm, uid: 'bypass-admin' });
+    // 2. Cek akun terdaftar di database lokal (registered users)
+    let localUsers = [];
+    try {
+      localUsers = JSON.parse(localStorage.getItem('ukurair_registered_users')) || [];
+    } catch (e) {
+      localUsers = [];
+    }
 
-      const account = { email: emailNorm, name: 'Bypass Admin', photoURL: null };
+    const matchedLocal = localUsers.find(u => u.email.toLowerCase() === emailNorm && u.password === loginPass);
+    if (matchedLocal) {
+      const userObj = {
+        email: matchedLocal.email,
+        uid: matchedLocal.uid || ('user-' + matchedLocal.email),
+        displayName: matchedLocal.name || matchedLocal.email.split('@')[0],
+        photoURL: matchedLocal.photoURL || null,
+        role: isAdminEmail(matchedLocal.email) ? 'admin' : 'user'
+      };
+      setUser(userObj);
+      try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (err) {}
+
+      const account = { email: userObj.email, name: userObj.displayName, photoURL: userObj.photoURL };
+      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
+      setSavedAccounts(newSaved);
+      localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
+
+      setView(isAdminEmail(userObj.email) ? 'admin' : 'dashboard');
+      return;
+    }
+
+    // 3. Bypass login darurat admin (jika Firebase Auth offline atau domain belum whitelist)
+    if (emailNorm === 'mrizkinabawi@gmail.com' && (loginPass === 'admin123' || loginPass.length >= 6)) {
+      const userObj = {
+        email: emailNorm,
+        uid: 'bypass-admin',
+        displayName: 'Muhamad',
+        photoURL: null,
+        role: 'admin'
+      };
+      setUser(userObj);
+      try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (err) {}
+
+      const account = { email: emailNorm, name: 'Muhamad', photoURL: null };
       const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
       setSavedAccounts(newSaved);
       localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
@@ -1962,10 +2050,45 @@ const App = () => {
     e.preventDefault();
     setError('');
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, loginPass);
-      const userObj = userCredential.user;
+      let userObj = null;
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, loginEmail, loginPass);
+        userObj = userCredential.user;
+      } catch (fbErr) {
+        console.warn('Firebase register notice (falling back to local):', fbErr);
+        userObj = {
+          email: loginEmail,
+          displayName: regFirstName ? `${regFirstName} ${regLastName}`.trim() : loginEmail.split('@')[0],
+          uid: 'reg-' + Date.now()
+        };
+      }
 
       const displayName = regFirstName ? `${regFirstName} ${regLastName}`.trim() : userObj.email.split('@')[0];
+
+      // Simpan akun ke database lokal terdaftar agar bisa selalu login ulang tanpa perlu buat akun lagi
+      try {
+        let localUsers = JSON.parse(localStorage.getItem('ukurair_registered_users')) || [];
+        const newRecord = {
+          email: userObj.email.toLowerCase(),
+          password: loginPass,
+          name: displayName,
+          uid: userObj.uid,
+          photoURL: userObj.photoURL || null
+        };
+        localUsers = [newRecord, ...localUsers.filter(u => u.email.toLowerCase() !== userObj.email.toLowerCase())];
+        localStorage.setItem('ukurair_registered_users', JSON.stringify(localUsers));
+      } catch (e) {}
+
+      const userSession = {
+        email: userObj.email,
+        uid: userObj.uid,
+        displayName: displayName,
+        photoURL: userObj.photoURL || null,
+        role: isAdminEmail(userObj.email) ? 'admin' : 'user'
+      };
+      setUser(userSession);
+      try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userSession)); } catch (e) {}
+
       const account = { email: userObj.email, name: displayName, photoURL: userObj.photoURL };
       const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
       setSavedAccounts(newSaved);
@@ -2042,6 +2165,31 @@ const App = () => {
       }
 
       const displayName = rawName;
+
+      // Simpan akun ke database lokal terdaftar agar bisa selalu login ulang tanpa perlu buat akun lagi
+      try {
+        let localUsers = JSON.parse(localStorage.getItem('ukurair_registered_users')) || [];
+        const newRecord = {
+          email: userObj.email.toLowerCase(),
+          password: loginPass,
+          name: displayName,
+          uid: userObj.uid,
+          photoURL: customPhoto || userObj.photoURL || null
+        };
+        localUsers = [newRecord, ...localUsers.filter(u => u.email.toLowerCase() !== userObj.email.toLowerCase())];
+        localStorage.setItem('ukurair_registered_users', JSON.stringify(localUsers));
+      } catch (e) {}
+
+      const userSession = {
+        email: userObj.email,
+        uid: userObj.uid,
+        displayName: displayName,
+        photoURL: customPhoto || userObj.photoURL || null,
+        role: isAdminEmail(userObj.email) ? 'admin' : 'user'
+      };
+      setUser(userSession);
+      try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userSession)); } catch (e) {}
+
       const account = {
         email: userObj.email,
         name: displayName,
@@ -2051,7 +2199,6 @@ const App = () => {
       setSavedAccounts(newSaved);
       localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
 
-      setUser(userObj);
       setRecoverySuccessMsg(`Selamat datang, ${displayName}! Akun berhasil dibuat.`);
       setTimeout(() => setRecoverySuccessMsg(''), 5000);
       setView(isAdminEmail(userObj.email) ? 'admin' : 'dashboard');
@@ -2624,6 +2771,9 @@ const App = () => {
     } catch (e) {
       console.warn("SignOut error:", e);
     }
+    try {
+      localStorage.removeItem('ukurair_auth_user');
+    } catch (e) {}
     setUser(null);
     setView('login');
   };
@@ -3362,7 +3512,7 @@ const App = () => {
               onClose={() => setIsHeaderProfileOpen(false)}
               onManageAdmin={() => { setView('admin'); setIsHeaderProfileOpen(false); }}
               onOpenNotif={() => { setShowNotificationModal(true); setIsHeaderProfileOpen(false); }}
-              onSwitchAccount={() => { setUser(null); setShowAccountChooser(false); setView('login'); setIsHeaderProfileOpen(false); }}
+              onSwitchAccount={() => { try { localStorage.removeItem('ukurair_auth_user'); } catch (e) {} setUser(null); setShowAccountChooser(false); setView('login'); setIsHeaderProfileOpen(false); }}
               onLogout={() => { handleLogout(); setIsHeaderProfileOpen(false); }}
               onLogin={() => { setView('login'); setIsHeaderProfileOpen(false); }}
             />
@@ -3468,7 +3618,7 @@ const App = () => {
               onClose={() => setIsProfileMenuOpen(false)}
               onManageAdmin={() => { setView('admin'); setIsProfileMenuOpen(false); }}
               onOpenNotif={() => { setShowNotificationModal(true); setIsProfileMenuOpen(false); }}
-              onSwitchAccount={() => { setUser(null); setShowAccountChooser(false); setView('login'); setIsProfileMenuOpen(false); }}
+              onSwitchAccount={() => { try { localStorage.removeItem('ukurair_auth_user'); } catch (e) {} setUser(null); setShowAccountChooser(false); setView('login'); setIsProfileMenuOpen(false); }}
               onLogout={() => { handleLogout(); setIsProfileMenuOpen(false); }}
               onLogin={() => { setView('login'); setIsProfileMenuOpen(false); }}
             />

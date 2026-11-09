@@ -3381,40 +3381,38 @@ const App = () => {
 
 
 
-      {/* Floating Menu Button (Muncul ketika menu disembunyikan ke samping) */}
+      {/* Floating Menu / Titik Pantau Button (Muncul ketika menu disembunyikan ke samping / diminimalkan) */}
       {(view === 'dashboard' || view === 'device-detail') && !isNavSidebarOpen && (
         <div
           className="floating-menu-btn animate-fade-in"
           onClick={() => setIsNavSidebarOpen(true)}
-          title="Buka Menu"
+          title="Buka Titik Pantau"
         >
-          <Menu size={22} color="var(--text-primary)" />
-          <span>Menu</span>
+          <Menu size={20} color="var(--accent)" />
+          <span>Titik Pantau</span>
         </div>
       )}
 
-      {/* Floating Search Bar */}
+      {/* Floating Top Bar (Search & Profile/Login Berdampingan Rapi Tanpa Tabrakan) */}
       {(view === 'dashboard' || view === 'device-detail') && (
-        <div className="floating-search-bar">
-          <Search size={18} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
-          <input
-            type="text"
-            placeholder="Telusuri lokasi pemantauan..."
-            value={searchQuery}
-            onFocus={() => { if (!isNavSidebarOpen) setIsNavSidebarOpen(true); }}
-            onChange={e => {
-              setSearchQuery(e.target.value);
-              if (e.target.value.trim() && !isNavSidebarOpen) setIsNavSidebarOpen(true);
-            }}
-            style={{ border: 'none', background: 'transparent', color: 'white', padding: '0 10px', width: '100%', outline: 'none', fontSize: '0.88rem' }}
-          />
-          {searchQuery && <X size={18} color="var(--text-secondary)" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => setSearchQuery('')} />}
-        </div>
-      )}
+        <div className="floating-top-bar">
+          <div className="floating-search-bar">
+            <Search size={18} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Telusuri lokasi pemantauan..."
+              value={searchQuery}
+              onFocus={() => { if (!isNavSidebarOpen) setIsNavSidebarOpen(true); }}
+              onChange={e => {
+                setSearchQuery(e.target.value);
+                if (e.target.value.trim() && !isNavSidebarOpen) setIsNavSidebarOpen(true);
+              }}
+              style={{ border: 'none', background: 'transparent', color: 'white', padding: '0 8px', width: '100%', minWidth: 0, outline: 'none', fontSize: '0.86rem' }}
+            />
+            {searchQuery && <X size={16} color="var(--text-secondary)" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={() => setSearchQuery('')} />}
+          </div>
 
-      {/* Floating Profile Icon (Top Right) */}
-      {(view === 'dashboard' || view === 'device-detail') && (
-        <div className="floating-profile-container">
+          <div className="floating-profile-container">
 
           {/* Desktop Navigation Buttons */}
           <div className="nav-action-pill animate-fade-in">
@@ -3485,6 +3483,7 @@ const App = () => {
             />
           )}
         </div>
+      </div>
       )}
 
       {/* Slide-out Menu (Hamburger) */}
@@ -3541,7 +3540,12 @@ const App = () => {
             <div
               className="mobile-only-nav-item"
               style={{ display: 'none', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', color: activeTab === 'all' && !selectedDevice ? 'var(--accent)' : 'var(--text-secondary)' }}
-              onClick={() => { setActiveTab('all'); setView('dashboard'); setSelectedDevice(null); }}
+              onClick={() => {
+                setActiveTab('all');
+                setView('dashboard');
+                setSelectedDevice(null);
+                setIsNavSidebarOpen(prev => !prev);
+              }}
             >
               <Home size={22} color={activeTab === 'all' && !selectedDevice ? 'var(--accent)' : 'var(--text-secondary)'} />
               <span style={{ fontSize: '10px', marginTop: '2px', fontWeight: activeTab === 'all' && !selectedDevice ? 700 : 400 }}>Peta</span>
@@ -3554,7 +3558,7 @@ const App = () => {
               title="Sembunyikan Menu ke Samping"
             >
               <Menu size={22} color="var(--text-primary)" />
-              <span style={{ fontSize: '10px', marginTop: '2px', fontWeight: 500 }}>Menu</span>
+              <span style={{ fontSize: '10px', marginTop: '2px', fontWeight: 500 }}>Titik Pantau</span>
             </div>
 
             {/* 2. Disimpan */}
@@ -3583,7 +3587,9 @@ const App = () => {
 
             {view === 'dashboard' && (
               <div className="sidebar-content">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                {/* Handle Bar Drag/Minimize di HP */}
+                <div className="mobile-sheet-handle" onClick={() => setIsNavSidebarOpen(false)} title="Minimalkan Panel Titik Pantau" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                   <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>
                     {activeTab === 'saved' ? 'Lokasi Disimpan' : activeTab === 'recent' ? 'Histori Pencarian' : 'Titik Pantau'}
                   </h2>

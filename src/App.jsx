@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   FloodZoneLayer,
   SimulationControlPanel,
-  AdminZonePanel,
+  EditRangeModal,
   useFloodZones,
 } from './FloodSimulation';
 import {
@@ -1171,13 +1171,13 @@ const App = () => {
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isHeaderProfileOpen, setIsHeaderProfileOpen] = useState(false);
 
-  // ─── State Simulasi Zona Genangan ───────────────────────────────────────────
+  // ─── State Simulasi & Range Zona Genangan ─────────────────────────────────
   // simulatedValue HANYA untuk tampilan — TIDAK pernah dikirim ke Firebase
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [simulatedValue, setSimulatedValue] = useState(80);
   const [showFloodZones, setShowFloodZones] = useState(true);
-  const [showAdminZonePanel, setShowAdminZonePanel] = useState(false);
-  const { zones: floodZones, loadingZones, usingDemo, saveZone, deleteZone } = useFloodZones();
+  const [editingRangeDevice, setEditingRangeDevice] = useState(null);
+  const { zones: floodZones, loadingZones, saveZone, deleteZone } = useFloodZones();
 
   // Tutup dropdown sugesti pencarian saat user klik di luar container
   useEffect(() => {
@@ -3594,27 +3594,53 @@ const App = () => {
                           </>
                         );
                       })()}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDetailModalDevice(device);
-                        }}
-                        style={{
-                          background: 'var(--accent)',
-                          color: '#0f172a',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '4px 10px',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}
-                      >
-                        <BarChart3 size={13} /> Lihat Grafik
-                      </button>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '6px' }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetailModalDevice(device);
+                          }}
+                          style={{
+                            background: 'var(--accent)',
+                            color: '#0f172a',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <BarChart3 size={13} /> Lihat Grafik
+                        </button>
+                        {isAdminUser && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingRangeDevice(device);
+                            }}
+                            title="Atur range jangkauan, warna & kondisi tanah untuk titik ini"
+                            style={{
+                              background: 'rgba(56, 189, 248, 0.15)',
+                              color: '#38bdf8',
+                              border: '1px solid #0284c7',
+                              borderRadius: '6px',
+                              padding: '4px 10px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <Sliders size={13} /> Atur Range
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </Popup>
                 </Marker>
@@ -3627,13 +3653,8 @@ const App = () => {
               <FloodZoneLayer
                 zones={floodZones}
                 simulatedValue={simulatedValue}
-                selectedSensorId={null}
-                deviceData={data.map(d => ({
-                  ...d,
-                  isOnline: isDeviceOnline(d),
-                  last_updated: parseCreatedAt(d.created_at, 0),
-                }))}
                 isSimulationMode={isSimulationMode}
+                editingDevice={editingRangeDevice}
               />
             )}
           </MapContainer>
@@ -3642,42 +3663,23 @@ const App = () => {
 
       {/* ─── Panel Kontrol Simulasi (Floating, hanya di dashboard/device-detail) */}
       {(view === 'dashboard' || view === 'device-detail') && (
-        <>
-          <SimulationControlPanel
-            zones={floodZones}
-            isSimulationMode={isSimulationMode}
-            setIsSimulationMode={setIsSimulationMode}
-            simulatedValue={simulatedValue}
-            setSimulatedValue={setSimulatedValue}
-            showZones={showFloodZones}
-            setShowZones={setShowFloodZones}
-            isAdminUser={isAdminUser}
-            onOpenAdminZone={() => setShowAdminZonePanel(true)}
-            deviceData={data.map(d => ({ ...d, isOnline: isDeviceOnline(d), last_updated: parseCreatedAt(d.created_at, 0) }))}
-          />
-          {/* Badge DEMO jika menggunakan data contoh */}
-          {usingDemo && showFloodZones && (
-            <div style={{
-              position: 'absolute', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-              zIndex: 999, background: 'rgba(120,53,15,0.95)', border: '1px solid #d97706',
-              borderRadius: '20px', padding: '4px 14px', fontSize: '0.68rem',
-              color: '#fef3c7', fontWeight: 700, pointerEvents: 'none',
-              whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
-            }}>
-              ⚠️ DEMO / CONTOH — Zona di peta bukan data lapangan nyata
-            </div>
-          )}
-        </>
+        <SimulationControlPanel
+          isSimulationMode={isSimulationMode}
+          setIsSimulationMode={setIsSimulationMode}
+          simulatedValue={simulatedValue}
+          setSimulatedValue={setSimulatedValue}
+          showZones={showFloodZones}
+          setShowZones={setShowFloodZones}
+        />
       )}
 
-      {/* ─── Modal Admin Kelola Zona ──────────────────────────────────────────── */}
-      {showAdminZonePanel && isAdminUser && (
-        <AdminZonePanel
-          zones={floodZones}
-          onClose={() => setShowAdminZonePanel(false)}
-          deviceList={devices}
-          onSave={saveZone}
-          onDelete={deleteZone}
+      {/* ─── Modal Sederhana: Edit Range & Warna Titik Pantau Langsung (Admin) ─── */}
+      {editingRangeDevice && isAdminUser && (
+        <EditRangeModal
+          device={editingRangeDevice}
+          currentZone={floodZones.find(z => z.device_id === editingRangeDevice.id || z.id === `zone-${editingRangeDevice.id}`)}
+          onClose={() => setEditingRangeDevice(null)}
+          onSaveZone={saveZone}
         />
       )}
 

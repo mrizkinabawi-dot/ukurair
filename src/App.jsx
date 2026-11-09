@@ -3308,75 +3308,66 @@ const App = () => {
 
       {/* Floating Header (Only for Admin/Login now) */}
       <header className="header" style={{ display: (view === 'dashboard' || view === 'device-detail') ? 'none' : 'flex' }}>
-        <div className="logo" onClick={() => { setView('dashboard'); setSelectedDevice(null); }} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.8rem' }}>
-          <img src="/logo.png" alt="Logo" style={{ width: '40px', height: '40px', borderRadius: '50%' }} /> Monitoring Banjir IOT
+        {/* SISI KIRI: Brand Logo & Title "IOT Banjir" */}
+        <div className="header-brand" onClick={() => { setView('dashboard'); setSelectedDevice(null); }} style={{ cursor: 'pointer' }}>
+          <img src="/logo.png" alt="Logo" className="header-logo-img" />
+          <span className="header-brand-title">IOT Banjir</span>
         </div>
-        <nav style={{ display: 'flex', gap: '1.2rem', alignItems: 'center' }}>
-          {/* Logo Profil User di Sebelah Kiri Peta Utama */}
-          <div style={{ position: 'relative' }}>
-            <div
-              onClick={() => setIsHeaderProfileOpen(!isHeaderProfileOpen)}
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '50%',
-                background: userPhoto ? 'transparent' : 'linear-gradient(135deg, #0284c7, #6366f1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                border: '2px solid rgba(56, 189, 248, 0.45)',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-                overflow: 'hidden',
-                transition: 'transform 0.15s, border-color 0.2s'
-              }}
-              onMouseOver={e => e.currentTarget.style.transform = 'scale(1.08)'}
-              onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
-              title={user ? (user.displayName || user.email) : 'Profil Akun (Ubah Foto / Info)'}
-            >
-              {userPhoto ? (
-                <img src={userPhoto} alt="Foto Profil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : user ? (
-                <span style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                  {getUserDisplayName(user)[0].toUpperCase()}
-                </span>
-              ) : (
-                <User size={19} color="#ffffff" />
-              )}
-            </div>
 
-            {/* Popup Profil Google Chrome Style */}
-            {isHeaderProfileOpen && (
-              <ProfileChromePopup
-                user={user}
-                userPhoto={userPhoto}
-                userDisplayName={getUserDisplayName(user)}
-                handlePhotoUpload={handlePhotoUpload}
-                isAdminUser={isAdminUser}
-                onClose={() => setIsHeaderProfileOpen(false)}
-                onManageAdmin={() => { setView('admin'); setIsHeaderProfileOpen(false); }}
-                onOpenNotif={() => { setShowNotificationModal(true); setIsHeaderProfileOpen(false); }}
-                onSwitchAccount={() => { setUser(null); setShowAccountChooser(false); setView('login'); setIsHeaderProfileOpen(false); }}
-                onLogout={() => { handleLogout(); setIsHeaderProfileOpen(false); }}
-                onLogin={() => { setView('login'); setIsHeaderProfileOpen(false); }}
-              />
-            )}
-          </div>
-
-          <button onClick={() => { setView('dashboard'); setSelectedDevice(null); }} className="btn" style={{ background: 'transparent', border: 'none', color: 'white' }}>
+        {/* SISI TENGAH: Peta Utama dan Masuk / Admin Panel */}
+        <nav className="header-nav-center">
+          <button onClick={() => { setView('dashboard'); setSelectedDevice(null); }} className="btn btn-header-nav">
             Peta Utama
           </button>
           {user ? (
             isAdminUser ? (
-              <button onClick={() => setView('admin')} className={`btn ${view === 'admin' ? 'active-nav' : ''}`} style={{ background: 'transparent', border: 'none', color: view === 'admin' ? 'var(--accent)' : 'white' }}>
+              <button onClick={() => setView('admin')} className={`btn btn-header-nav ${view === 'admin' ? 'active-nav' : ''}`}>
                 Admin Panel
               </button>
             ) : null
           ) : (
-            <button onClick={() => setView('login')} className="btn" style={{ border: '1px solid var(--accent)', color: 'var(--accent)' }}>Login</button>
+            <button onClick={() => setView('login')} className="btn btn-header-nav btn-header-login">
+              Masuk
+            </button>
           )}
-          {user && <button onClick={handleLogout} className="btn" style={{ border: '1px solid var(--border)', fontSize: '0.75rem' }}>Logout</button>}
+          {user && <button onClick={handleLogout} className="btn btn-header-nav btn-header-logout">Logout</button>}
         </nav>
+
+        {/* SISI KANAN: Menu Orang / Foto Profil User & Fitur Wallpaper */}
+        <div className="header-profile-right">
+          <div
+            onClick={() => setIsHeaderProfileOpen(!isHeaderProfileOpen)}
+            className="header-avatar-btn"
+            title={user ? (user.displayName || user.email) : 'Profil Akun (Ubah Foto / Info)'}
+          >
+            {userPhoto ? (
+              <img src={userPhoto} alt="Foto Profil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : user ? (
+              <span style={{ color: '#ffffff', fontWeight: 'bold', fontSize: '1.1rem' }}>
+                {getUserDisplayName(user)[0].toUpperCase()}
+              </span>
+            ) : (
+              <User size={19} color="#ffffff" />
+            )}
+          </div>
+
+          {/* Popup Profil Google Chrome Style */}
+          {isHeaderProfileOpen && (
+            <ProfileChromePopup
+              user={user}
+              userPhoto={userPhoto}
+              userDisplayName={getUserDisplayName(user)}
+              handlePhotoUpload={handlePhotoUpload}
+              isAdminUser={isAdminUser}
+              onClose={() => setIsHeaderProfileOpen(false)}
+              onManageAdmin={() => { setView('admin'); setIsHeaderProfileOpen(false); }}
+              onOpenNotif={() => { setShowNotificationModal(true); setIsHeaderProfileOpen(false); }}
+              onSwitchAccount={() => { setUser(null); setShowAccountChooser(false); setView('login'); setIsHeaderProfileOpen(false); }}
+              onLogout={() => { handleLogout(); setIsHeaderProfileOpen(false); }}
+              onLogin={() => { setView('login'); setIsHeaderProfileOpen(false); }}
+            />
+          )}
+        </div>
       </header>
 
 
@@ -3492,7 +3483,7 @@ const App = () => {
           <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.6)', zIndex: 199, backdropFilter: 'blur(2px)' }} onClick={() => setIsMenuOpen(false)} />
           <div style={{ position: 'absolute', top: 0, left: 0, width: '300px', maxWidth: '85vw', height: '100vh', background: 'var(--bg-primary)', zIndex: 200, padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', boxShadow: '5px 0 25px rgba(0,0,0,0.8)' }} className="animate-fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 800 }}><img src="/logo.png" alt="Logo" style={{ width: '36px', height: '36px', borderRadius: '50%' }} /> Monitoring Banjir IOT</h2>
+              <h2 style={{ fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 800 }}><img src="/logo.png" alt="Logo" style={{ width: '36px', height: '36px', borderRadius: '50%' }} /> IOT Banjir</h2>
               <X size={24} style={{ cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setIsMenuOpen(false)} />
             </div>
             <hr style={{ borderColor: 'var(--border)' }} />
@@ -4189,9 +4180,9 @@ const App = () => {
       {/* Main Content for Login and Admin */}
       {(view === 'login' || view === 'admin') && (
         <div className="main-wrapper animate-fade-in">
-          <main className="main-content">
+          <main className={`main-content ${view === 'login' ? 'login-page-main' : ''}`}>
             {view === 'login' && (
-              <div className="login-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#0f172a', position: 'relative' }}>
+              <div className="login-container">
 
                 {/* 1. POP-UP SIMULASI PESAN GMAIL MASUK (Untuk Pemulihan via Gmail) */}
                 {recoverySimulatedGmail && (
@@ -4349,11 +4340,11 @@ const App = () => {
                 {/* KONDISI 1: TAMPILAN LUPA EMAIL (DEFAULT GMAIL / CARA LAIN NOMOR HP) */}
                 {/* ======================================================== */}
                 {isForgotEmail ? (
-                  <div className="login-card" style={{ background: '#1e293b', padding: '40px', borderRadius: '24px', width: '100%', maxWidth: '900px', display: 'flex', gap: '40px', flexWrap: 'wrap', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.5)', position: 'relative' }}>
+                  <div className="login-card login-forgot-card">
 
                     {/* Kolom Kiri */}
-                    <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <svg viewBox="0 0 24 24" width="48" height="48" style={{ marginBottom: '15px' }}>
+                    <div className="login-card-left">
+                      <svg className="login-google-logo" viewBox="0 0 24 24">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                         <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
@@ -4361,7 +4352,7 @@ const App = () => {
                       </svg>
 
                       {/* Judul & Penjelasan Dinamis Sesuai Metode */}
-                      <h1 style={{ fontSize: '2.2rem', margin: '0 0 12px 0', fontWeight: 400, color: '#f8fafc', lineHeight: 1.25 }}>
+                      <h1 className="login-title">
                         {recoveryMode === 'gmail' ? (
                           forgotStep === 1 ? 'Konfirmasi via Gmail' :
                             forgotStep === 2 ? 'Periksa Kotak Masuk Gmail' : 'Akun Ditemukan'
@@ -4371,7 +4362,7 @@ const App = () => {
                         )}
                       </h1>
 
-                      <p style={{ margin: 0, color: '#e2e8f0', fontSize: '1rem', lineHeight: 1.5 }}>
+                      <p className="login-subtitle">
                         {recoveryMode === 'gmail' ? (
                           forgotStep === 1 ? 'Google akan mengirimkan kode konfirmasi 6 digit ke alamat Gmail Anda untuk memverifikasi akun.' :
                             forgotStep === 2 ? `Masukkan kode verifikasi 6 digit yang dikirimkan ke ${recoveryEmailInput || 'Gmail Anda'}.` :
@@ -4384,16 +4375,16 @@ const App = () => {
                       </p>
 
                       {/* Indikator Metode Aktif */}
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '20px', padding: '6px 14px', background: recoveryMode === 'gmail' ? 'rgba(234, 67, 53, 0.15)' : 'rgba(56, 189, 248, 0.15)', border: '1px solid ' + (recoveryMode === 'gmail' ? '#ea4335' : '#38bdf8'), borderRadius: '20px', width: 'fit-content' }}>
-                        {recoveryMode === 'gmail' ? <Mail size={15} color="#ea4335" /> : <Smartphone size={15} color="#38bdf8" />}
-                        <span style={{ fontSize: '0.82rem', fontWeight: 600, color: recoveryMode === 'gmail' ? '#fca5a5' : '#38bdf8' }}>
-                          Metode Aktif: {recoveryMode === 'gmail' ? 'Verifikasi Gmail' : 'Verifikasi Nomor HP (Cara Lain)'}
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', marginTop: '14px', padding: '5px 12px', background: recoveryMode === 'gmail' ? 'rgba(234, 67, 53, 0.15)' : 'rgba(56, 189, 248, 0.15)', border: '1px solid ' + (recoveryMode === 'gmail' ? '#ea4335' : '#38bdf8'), borderRadius: '20px', width: 'fit-content' }}>
+                        {recoveryMode === 'gmail' ? <Mail size={14} color="#ea4335" /> : <Smartphone size={14} color="#38bdf8" />}
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: recoveryMode === 'gmail' ? '#fca5a5' : '#38bdf8' }}>
+                          Metode Aktif: {recoveryMode === 'gmail' ? 'Verifikasi Gmail' : 'Verifikasi Nomor HP'}
                         </span>
                       </div>
                     </div>
 
                     {/* Kolom Kanan */}
-                    <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: '10px' }}>
+                    <div className="login-card-right">
                       {error && (
                         <div className="error-msg" style={{ color: '#ef4444', marginBottom: '15px', fontSize: '0.9rem', padding: '10px 14px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid #ef4444', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <AlertTriangle size={16} />
@@ -4795,34 +4786,34 @@ const App = () => {
                   /* ======================================================== */
                   /* KONDISI 2: FORM LOGIN / REGISTER NORMAL                  */
                   /* ======================================================== */
-                  <div className="login-card" style={{ background: '#1e293b', padding: '40px', borderRadius: '24px', width: '100%', maxWidth: '900px', display: 'flex', gap: '40px', flexWrap: 'wrap', border: 'none', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+                  <div className="login-card">
 
                     {/* Left Column */}
-                    <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                      <svg viewBox="0 0 24 24" width="48" height="48" style={{ marginBottom: '15px' }}>
+                    <div className="login-card-left">
+                      <svg className="login-google-logo" viewBox="0 0 24 24">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                         <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
                         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
                         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                       </svg>
-                      <h1 style={{ fontSize: '2.4rem', margin: '0 0 12px 0', fontWeight: 400, color: '#f8fafc' }}>
-                        {isRegister ? 'Buat Akun Google' : 'Login'}
+                      <h1 className="login-title">
+                        {isRegister ? 'Buat Akun' : 'Masuk'}
                       </h1>
-                      <p style={{ margin: 0, color: '#e2e8f0', fontSize: '1.05rem' }}>
-                        {isRegister ? 'Cukup masukkan nama, email Google, dan sandi baru' : 'Lanjutkan ke Pemantauan Banjir IOT'}
+                      <p className="login-subtitle">
+                        {isRegister ? 'Cukup masukkan nama, email Google, dan sandi baru' : 'Lanjutkan ke IOT Banjir'}
                       </p>
                     </div>
 
                     {/* Right Column */}
-                    <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingTop: '20px' }}>
+                    <div className="login-card-right">
                       {recoverySuccessMsg && (
-                        <div style={{ color: '#34d399', marginBottom: '15px', fontSize: '0.9rem', padding: '12px 14px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid #10b981', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Check size={18} color="#34d399" />
+                        <div style={{ color: '#34d399', marginBottom: '12px', fontSize: '0.88rem', padding: '10px 12px', background: 'rgba(16, 185, 129, 0.12)', border: '1px solid #10b981', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Check size={16} color="#34d399" />
                           <span>{recoverySuccessMsg}</span>
                         </div>
                       )}
 
-                      {error && <div className="error-msg" style={{ color: '#ef4444', marginBottom: '15px', fontSize: '0.9rem', padding: '10px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px' }}>{error}</div>}
+                      {error && <div className="error-msg" style={{ color: '#ef4444', marginBottom: '12px', fontSize: '0.88rem', padding: '10px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px' }}>{error}</div>}
 
                       {/* FORM LOGIN ATAU REGISTER */}
                       <form onSubmit={(e) => {
@@ -4833,78 +4824,76 @@ const App = () => {
                         } else {
                           handleLogin(e);
                         }
-                      }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                      }} style={{ display: 'flex', flexDirection: 'column' }}>
 
                         {isRegister ? (
                           <>
-                            {/* FORM DAFTAR AKUN BARU (Langsung Tanpa Nomor HP & Tanpa OTP) */}
-                            <div style={{ marginBottom: '18px' }}>
-                              <label style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '6px' }}>
+                            {/* FORM DAFTAR AKUN BARU */}
+                            <div className="login-input-group">
+                              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
                                 Nama Lengkap / Username
                               </label>
                               <input
                                 type="text"
+                                className="login-input-field"
                                 value={regFirstName}
                                 onChange={e => setRegFirstName(e.target.value)}
                                 placeholder="Contoh: Muhamad"
                                 required
                                 autoFocus
-                                style={{ width: '100%', padding: '15px 14px', background: 'transparent', border: '1px solid #5f6368', borderRadius: '4px', color: '#f8fafc', outline: 'none', fontSize: '1rem' }}
                               />
                             </div>
 
-                            <div style={{ marginBottom: '18px' }}>
-                              <label style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '6px' }}>
+                            <div className="login-input-group">
+                              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
                                 Alamat Gmail / Akun Google
                               </label>
                               <input
                                 type="email"
+                                className="login-input-field"
                                 value={loginEmail}
                                 onChange={e => setLoginEmail(e.target.value)}
                                 placeholder="nama@gmail.com"
                                 required
-                                style={{ width: '100%', padding: '15px 14px', background: 'transparent', border: '1px solid #5f6368', borderRadius: '4px', color: '#f8fafc', outline: 'none', fontSize: '1rem' }}
                               />
                             </div>
 
-                            <div style={{ marginBottom: '24px' }}>
-                              <label style={{ display: 'block', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '6px' }}>
+                            <div className="login-input-group">
+                              <label style={{ display: 'block', fontSize: '0.82rem', color: '#94a3b8', marginBottom: '4px' }}>
                                 Kata Sandi Baru
                               </label>
                               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <input
                                   type={showPassword ? "text" : "password"}
+                                  className="login-input-field"
                                   value={loginPass}
                                   onChange={e => setLoginPass(e.target.value)}
                                   placeholder="Minimal 6 karakter"
                                   required
-                                  style={{ width: '100%', padding: '15px 48px 15px 14px', background: 'transparent', border: '1px solid #5f6368', borderRadius: '4px', color: '#f8fafc', outline: 'none', fontSize: '1rem' }}
+                                  style={{ paddingRight: '44px' }}
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setShowPassword(!showPassword)}
                                   style={{
                                     position: 'absolute',
-                                    right: '12px',
+                                    right: '10px',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
                                     background: 'transparent',
                                     border: 'none',
                                     color: showPassword ? '#8ab4f8' : '#9aa0a6',
                                     cursor: 'pointer',
-                                    padding: '6px',
+                                    padding: '5px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    borderRadius: '50%',
-                                    transition: 'color 0.2s, background 0.2s'
+                                    borderRadius: '50%'
                                   }}
                                   title={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
                                   aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-                                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                 >
-                                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                               </div>
                             </div>
@@ -4912,10 +4901,18 @@ const App = () => {
                         ) : (
                           <>
                             {/* FORM LOGIN */}
-                            <div style={{ marginBottom: '20px' }}>
-                              <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Email atau nomor telepon" required style={{ width: '100%', padding: '16px 15px', background: 'transparent', border: '1px solid #5f6368', borderRadius: '4px', color: '#f8fafc', outline: 'none', fontSize: '1rem' }} />
+                            <div className="login-input-group">
+                              <input
+                                type="email"
+                                className="login-input-field"
+                                value={loginEmail}
+                                onChange={e => setLoginEmail(e.target.value)}
+                                placeholder="Email atau nomor telepon"
+                                required
+                              />
                               <div
                                 id="btn-forgot-email"
+                                className="login-forgot-link"
                                 onClick={() => {
                                   setIsForgotEmail(true);
                                   setRecoveryMode('gmail');
@@ -4923,81 +4920,67 @@ const App = () => {
                                   setRecoveryEmailInput(loginEmail || 'mrizkinabawi@gmail.com');
                                   setError('');
                                 }}
-                                style={{ color: '#8ab4f8', fontSize: '0.95rem', marginTop: '12px', cursor: 'pointer', fontWeight: 600, display: 'inline-block' }}
                               >
                                 Lupa email?
                               </div>
                             </div>
 
-                            <div style={{ marginBottom: '30px' }}>
+                            <div className="login-input-group">
                               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                 <input
                                   type={showPassword ? "text" : "password"}
+                                  className="login-input-field"
                                   value={loginPass}
                                   onChange={e => setLoginPass(e.target.value)}
                                   placeholder="Kata sandi"
                                   required
-                                  style={{
-                                    width: '100%',
-                                    padding: '16px 48px 16px 15px',
-                                    background: 'transparent',
-                                    border: '1px solid #5f6368',
-                                    borderRadius: '4px',
-                                    color: '#f8fafc',
-                                    outline: 'none',
-                                    fontSize: '1rem'
-                                  }}
+                                  style={{ paddingRight: '44px' }}
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setShowPassword(!showPassword)}
                                   style={{
                                     position: 'absolute',
-                                    right: '12px',
+                                    right: '10px',
                                     top: '50%',
                                     transform: 'translateY(-50%)',
                                     background: 'transparent',
                                     border: 'none',
                                     color: showPassword ? '#8ab4f8' : '#9aa0a6',
                                     cursor: 'pointer',
-                                    padding: '6px',
+                                    padding: '5px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    borderRadius: '50%',
-                                    transition: 'color 0.2s, background 0.2s'
+                                    borderRadius: '50%'
                                   }}
                                   title={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
                                   aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-                                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                                 >
-                                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                               </div>
                             </div>
                           </>
                         )}
 
-                        <div style={{ flexGrow: 1 }}>
-                          {!isRegister && (
-                            <div style={{ marginBottom: '30px', fontSize: '0.9rem', color: '#9aa0a6', lineHeight: '1.5' }}>
-                              Bukan komputer Anda? Gunakan mode Tamu untuk login secara pribadi.<br />
-                              <span style={{ color: '#8ab4f8', cursor: 'pointer', fontWeight: 600 }}>Pelajari lebih lanjut cara menggunakan Mode tamu</span>
-                            </div>
-                          )}
-                        </div>
+                        {!isRegister && (
+                          <div className="login-guest-text">
+                            Bukan komputer Anda? Gunakan mode Tamu untuk login secara pribadi.<br />
+                            <span style={{ color: '#8ab4f8', cursor: 'pointer', fontWeight: 600 }}>Pelajari lebih lanjut cara menggunakan Mode tamu</span>
+                          </div>
+                        )}
 
                         {/* Navigasi Tombol Form Login / Register */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: isRegister ? '20px' : '0' }}>
+                        <div className="login-actions-row">
                           <span onClick={() => {
                             setIsRegister(!isRegister);
                             setError('');
-                          }} style={{ color: '#8ab4f8', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem' }}>
-                            {isRegister ? 'Login' : 'Buat akun'}
+                          }} style={{ color: '#8ab4f8', cursor: 'pointer', fontWeight: 600, fontSize: '0.92rem' }}>
+                            {isRegister ? 'Masuk' : 'Buat akun'}
                           </span>
 
-                          <button type="submit" id="btn-auth-submit" style={{ background: '#a8c7fa', color: '#062e6f', border: 'none', padding: '10px 24px', borderRadius: '24px', fontWeight: 600, cursor: 'pointer', fontSize: '0.95rem', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = '#8ab4f8'} onMouseOut={e => e.currentTarget.style.background = '#a8c7fa'}>
+                          <button type="submit" id="btn-auth-submit" className="login-submit-btn">
                             {isRegister ? 'Buat Akun' : 'Berikutnya'}
                           </button>
                         </div>

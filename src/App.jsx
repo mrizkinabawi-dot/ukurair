@@ -247,13 +247,25 @@ const MapFlyController = ({ target }) => {
   const map = useMap();
   useEffect(() => {
     try {
-      if (map && target && typeof target.lat === 'number' && typeof target.lng === 'number' && !isNaN(target.lat) && !isNaN(target.lng)) {
-        if (typeof map.flyTo === 'function') {
-          map.flyTo([target.lat, target.lng], target.zoom || 16, { duration: 1.2 });
-        }
+      if (!map || !target) return;
+      const lat = typeof target.lat === 'number' ? target.lat : parseFloat(target.lat);
+      const lng = typeof target.lng === 'number' ? target.lng : parseFloat(target.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
+      const zoom = target.zoom || 16;
+      if (typeof map.flyTo === 'function') {
+        map.flyTo([lat, lng], zoom, { duration: 1.2 });
+      } else if (typeof map.setView === 'function') {
+        map.setView([lat, lng], zoom);
       }
     } catch (err) {
       console.warn('MapFlyController error:', err);
+      try {
+        const lat = parseFloat(target?.lat);
+        const lng = parseFloat(target?.lng);
+        if (!isNaN(lat) && !isNaN(lng) && map && typeof map.setView === 'function') {
+          map.setView([lat, lng], target.zoom || 16);
+        }
+      } catch (e) {}
     }
   }, [target, map]);
   return null;
@@ -2360,43 +2372,19 @@ const App = () => {
     setNewDeviceId(`${base}-${rand}`);
   };
 
-  // Geocoding: Helper bersama untuk mencari alamat / tempat (Nominatim OpenStreetMap + Photon Komoot fallback)
+  // Geocoding Cepat & Akurat (Photon Komoot dengan Bias Koordinat Batam & Indonesia)
   const fetchGeocodePlaces = async (queryText) => {
     const q = (queryText || '').trim();
     if (!q || q.length < 2) return [];
 
     try {
       const controller = new AbortController();
-      const tid = setTimeout(() => controller.abort(), 4500);
+      const tid = setTimeout(() => controller.abort(), 4000);
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6&addressdetails=1`,
-        { signal: controller.signal, headers: { 'Accept-Language': 'id,en' } }
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&lat=1.128&lon=104.053&limit=8`,
+        { signal: controller.signal }
       );
       clearTimeout(tid);
-      if (res && res.ok) {
-        const json = await res.json();
-        if (Array.isArray(json) && json.length > 0) {
-          return json.map((item, idx) => {
-            const rawLat = parseFloat(item.lat);
-            const rawLng = parseFloat(item.lon);
-            const nameStr = String(item.name || (item.display_name ? item.display_name.split(',')[0] : '') || q || 'Lokasi');
-            return {
-              id: String(item.place_id || `nom-${idx}-${Math.random()}`),
-              title: nameStr,
-              fullAddress: String(item.display_name || item.name || nameStr),
-              lat: isNaN(rawLat) ? 1.128 : rawLat,
-              lng: isNaN(rawLng) ? 104.053 : rawLng,
-              type: String(item.type || item.class || 'Alamat')
-            };
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('Nominatim search failed, trying Photon fallback:', e);
-    }
-
-    try {
-      const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6`);
       if (res && res.ok) {
         const json = await res.json();
         if (json && Array.isArray(json.features) && json.features.length > 0) {
@@ -2419,7 +2407,7 @@ const App = () => {
         }
       }
     } catch (e) {
-      console.warn('Photon geocode fallback failed:', e);
+      console.warn('Photon geocode error:', e);
     }
 
     return [];
@@ -3711,9 +3699,7 @@ const App = () => {
                 placeholder="Telusuri titik pantau atau cari peta tujuan..."
                 value={searchQuery}
                 onFocus={() => {
-                  if (searchQuery.trim().length >= 1) {
-                    setShowDashboardSuggestions(true);
-                  }
+                  setShowDashboardSuggestions(true);
                 }}
                 onChange={handleMainSearchChange}
                 onKeyDown={handleMainSearchKeyDown}
@@ -3737,8 +3723,39 @@ const App = () => {
             </div>
 
             {/* Dropdown Hasil Pencarian Interaktif (Titik Pantau IoT + Tempat & Alamat di Peta) */}
-            {showDashboardSuggestions && searchQuery.trim().length >= 1 && (
+            {showDashboardSuggestions && (
               <div className="search-suggestions-dropdown">
+                {/* 0. Tampilkan semua titik pantau jika kolom pencarian belum diisi */}
+                {(!searchQuery || searchQuery.trim().length === 0) && data && data.length > 0 && (
+                  <div>
+                    <div className="suggestion-section-header">
+                      <Radio size={12} color="var(--accent)" /> Titik Pantau IoT Tersedia ({data.length})
+                    </div>
+                    {data.map(dev => {
+                      const eff = getDeviceEffectiveData(dev);
+                      return (
+                        <div
+                          key={`focus-dev-${dev.id}`}
+                          className="suggestion-item"
+                          onClick={() => handleSelectDeviceFromSearch(dev)}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: eff.isOnline ? '#10b981' : '#ef4444', flexShrink: 0 }} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.84rem', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {dev.name}
+                              </div>
+                              <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
+                                Tinggi: <b style={{ color: eff.isOnline ? 'var(--accent)' : '#ef4444' }}>{eff.water_level} cm</b> • {eff.isOnline ? 'Online' : 'Terputus'}
+                              </div>
+                            </div>
+                          </div>
+                          <Navigation size={14} color="var(--accent)" style={{ flexShrink: 0 }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {/* 1. Titik Pantau IoT */}
                 {matchingSearchDevices.length > 0 && (
                   <div>

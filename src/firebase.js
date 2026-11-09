@@ -4,14 +4,14 @@ import { getDatabase } from "firebase/database";
 import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCG1mdRXz3RFDaGMcgL7_kmHZm4_eEi8oA",
-    authDomain: "ukurair-a852a.firebaseapp.com",
-    projectId: "ukurair-a852a",
-    storageBucket: "ukurair-a852a.firebasestorage.app",
-    messagingSenderId: "180109813985",
-    appId: "1:180109813985:web:7aabd7533aa5cc19f6efa0",
-    measurementId: "G-VZZFQRXW98",
-    databaseURL: "https://ukurair-a852a-default-rtdb.firebaseio.com"
+    apiKey: "AIzaSyBVGwQL1Sh51q8Q33DbHNjsKnkeN5Z_CuA",
+    authDomain: "monitoring-ketinggian-air-1.firebaseapp.com",
+    databaseURL: "https://monitoring-ketinggian-air-1-default-rtdb.firebaseio.com",
+    projectId: "monitoring-ketinggian-air-1",
+    storageBucket: "monitoring-ketinggian-air-1.firebasestorage.app",
+    messagingSenderId: "776209845832",
+    appId: "1:776209845832:web:ae0645c0ae72672c4e927d",
+    measurementId: "G-DKRKWLF9RK"
 };
 
 // Initialize Firebase

@@ -3,6 +3,7 @@ import {
   FloodZoneLayer,
   SimulationControlPanel,
   EditRangeModal,
+  MapRoadDrawHandler,
   useFloodZones,
 } from './FloodSimulation';
 import {
@@ -1177,6 +1178,8 @@ const App = () => {
   const [simulatedValue, setSimulatedValue] = useState(80);
   const [showFloodZones, setShowFloodZones] = useState(true);
   const [editingRangeDevice, setEditingRangeDevice] = useState(null);
+  const [isDrawingRoad, setIsDrawingRoad] = useState(false);
+  const [activeDrawPoints, setActiveDrawPoints] = useState([]);
   const { zones: floodZones, loadingZones, saveZone, deleteZone } = useFloodZones();
 
   // Tutup dropdown sugesti pencarian saat user klik di luar container
@@ -3647,6 +3650,12 @@ const App = () => {
               );
             })}
 
+            {/* ─── Penangan Klik Peta Saat Mode Tandai Jalan Aktif ────────────── */}
+            <MapRoadDrawHandler
+              isDrawing={isDrawingRoad}
+              onAddPoint={(pt) => setActiveDrawPoints(prev => [...(prev || []), pt])}
+            />
+
             {/* ─── Flood Zone Overlay (Simulasi Zona Genangan) ─────────────────── */}
             {/* Layer ini HANYA visual. Tidak ada data IoT yang diubah. */}
             {showFloodZones && !loadingZones && (
@@ -3654,7 +3663,13 @@ const App = () => {
                 zones={floodZones}
                 simulatedValue={simulatedValue}
                 isSimulationMode={isSimulationMode}
-                editingDevice={editingRangeDevice}
+                drawingZone={isDrawingRoad ? {
+                  type: 'road',
+                  road_points: activeDrawPoints,
+                  road_width: 18,
+                  color: '#facc15',
+                  name: 'Sedang Ditandai di Peta'
+                } : null}
               />
             )}
           </MapContainer>
@@ -3678,8 +3693,15 @@ const App = () => {
         <EditRangeModal
           device={editingRangeDevice}
           currentZone={floodZones.find(z => z.device_id === editingRangeDevice.id || z.id === `zone-${editingRangeDevice.id}`)}
-          onClose={() => setEditingRangeDevice(null)}
+          onClose={() => {
+            setEditingRangeDevice(null);
+            setIsDrawingRoad(false);
+          }}
           onSaveZone={saveZone}
+          isDrawingRoad={isDrawingRoad}
+          setIsDrawingRoad={setIsDrawingRoad}
+          activeDrawPoints={activeDrawPoints}
+          setActiveDrawPoints={setActiveDrawPoints}
         />
       )}
 

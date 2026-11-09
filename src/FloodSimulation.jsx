@@ -643,6 +643,7 @@ export const EditRangeModal = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CircleDot size={18} color="#38bdf8" />
             <span style={{ fontWeight: 700, fontSize: '0.92rem' }}>Sesuaikan Range & Kontur Jalan</span>
+            <span style={{ fontSize: '0.62rem', background: '#0284c7', color: '#fff', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>v2.1</span>
           </div>
           <button
             onClick={onClose}
@@ -922,14 +923,14 @@ export const EditRangeModal = ({
           </div>
         </div>
 
-        {/* Footer Tombol Simpan & Tombol Hapus Semua */}
+        {/* Footer Tombol Simpan & Tombol Hapus */}
         <div style={{
           padding: '12px 18px',
           borderTop: '1px solid #1e293b',
           display: 'flex',
           flexDirection: 'column',
           gap: '8px',
-          background: 'rgba(30, 41, 59, 0.4)'
+          background: 'rgba(30, 41, 59, 0.7)'
         }}>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button
@@ -954,10 +955,34 @@ export const EditRangeModal = ({
               <Save size={15} />
               {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
             </button>
+
+            {/* Tombol Hapus Zona Tab Ini */}
+            <button
+              type="button"
+              onClick={handleClearCurrentZone}
+              title="Hapus atau matikan zona yang sedang dipilih ini"
+              style={{
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1px solid #ef4444',
+                background: 'rgba(239,68,68,0.18)',
+                color: '#f87171',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <Trash2 size={14} />
+              Hapus Zona {activeTab + 1}
+            </button>
+
             <button
               onClick={onClose}
               style={{
-                padding: '9px 16px',
+                padding: '9px 14px',
                 borderRadius: '8px',
                 border: '1px solid #475569',
                 background: 'transparent',
@@ -970,29 +995,29 @@ export const EditRangeModal = ({
             </button>
           </div>
 
-          {/* Tombol Hapus Semua Zona Titik Ini */}
+          {/* Tombol Hapus Semua Zona Sekaligus */}
           <button
             type="button"
             onClick={handleDeleteAllZones}
             disabled={saving}
             style={{
               width: '100%',
-              padding: '7px',
+              padding: '8px',
               borderRadius: '8px',
-              border: '1px dashed #ef4444',
-              background: 'rgba(239,68,68,0.1)',
-              color: '#fca5a5',
-              fontSize: '0.75rem',
-              fontWeight: 600,
+              border: '1px solid #ef4444',
+              background: 'rgba(239,68,68,0.25)',
+              color: '#ffffff',
+              fontSize: '0.76rem',
+              fontWeight: 700,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '5px'
+              gap: '6px'
             }}
           >
-            <Trash2 size={13} color="#ef4444" />
-            Hapus Semua Zona pada Titik Ini (Bersihkan Peta)
+            <Trash2 size={14} color="#fca5a5" />
+            Hapus Semua Zona Titik Ini (Bersihkan Peta)
           </button>
         </div>
       </div>

@@ -1086,6 +1086,21 @@ const App = () => {
     return 'dashboard';
   }); // 'dashboard', 'admin', 'login', 'device-detail'
   const [selectedDevice, setSelectedDevice] = useState(null);
+  const [adminEmails, setAdminEmails] = useState(['mrizkinabawi@gmail.com']);
+  const isAdminEmail = (email) => adminEmails.includes(String(email || '').trim().toLowerCase());
+
+  const [customPhoto, setCustomPhoto] = useState(() => {
+    try { return localStorage.getItem('ukurair_user_photo') || ''; } catch (e) { return ''; }
+  });
+
+  const getUserDisplayName = (u) => {
+    if (!u) return 'Tamu';
+    if (u.displayName) return u.displayName;
+    if (u.name) return u.name;
+    if (u.email === 'mrizkinabawi@gmail.com') return 'Muhamad';
+    return u.email ? u.email.split('@')[0] : 'User';
+  };
+
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('ukurair_auth_user');
@@ -1099,6 +1114,9 @@ const App = () => {
     return null;
   });
 
+  const isAdminUser = !!user && (user.uid === 'bypass-admin' || isAdminEmail(user.email));
+  const userPhoto = customPhoto || (user && user.photoURL) || null;
+
   // Sinkronisasi sesi login ke localStorage agar tetap login saat keluar/tutup browser
   useEffect(() => {
     try {
@@ -1108,7 +1126,7 @@ const App = () => {
           uid: user.uid || ('user-' + user.email),
           displayName: user.displayName || getUserDisplayName(user),
           photoURL: user.photoURL || customPhoto || null,
-          role: user.role || (adminEmails.includes(user.email.toLowerCase()) ? 'admin' : 'user')
+          role: user.role || (isAdminEmail(user.email) ? 'admin' : 'user')
         };
         localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj));
       }
@@ -1127,17 +1145,6 @@ const App = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isHeaderProfileOpen, setIsHeaderProfileOpen] = useState(false);
-  const [customPhoto, setCustomPhoto] = useState(() => localStorage.getItem('ukurair_user_photo') || '');
-
-  const getUserDisplayName = (u) => {
-    if (!u) return 'Tamu';
-    if (u.displayName) return u.displayName;
-    if (u.name) return u.name;
-    if (u.email === 'mrizkinabawi@gmail.com') return 'Muhamad';
-    return u.email.split('@')[0];
-  };
-
-  const userPhoto = customPhoto || (user && user.photoURL) || null;
 
   const handlePhotoUpload = (e) => {
     const file = e.target.files && e.target.files[0];
@@ -1304,7 +1311,6 @@ const App = () => {
     try { return JSON.parse(localStorage.getItem('savedAccounts')) || []; } catch (e) { return []; }
   });
   const [showAccountChooser, setShowAccountChooser] = useState(false);
-  const [adminEmails, setAdminEmails] = useState(['mrizkinabawi@gmail.com']);
 
   // Multi-step form states
   const [authStep, setAuthStep] = useState(1);
@@ -1959,9 +1965,6 @@ const App = () => {
   }, [view, selectedDevice?.id, deviceIdsKey, chartDateFilter, chartTimeFilter, detailModalDevice?.id]);
 
   // Auth Actions
-  const isAdminEmail = (email) => adminEmails.includes(String(email || '').trim().toLowerCase());
-  const isAdminUser = !!user && (user.uid === 'bypass-admin' || isAdminEmail(user.email));
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');

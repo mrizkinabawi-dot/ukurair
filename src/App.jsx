@@ -3938,7 +3938,7 @@ const App = () => {
       />
 
       {/* ─── Ringkasan Ketinggian Air Seluruh Wilayah (Untuk Pengguna di Luar Area) ─── */}
-      {(view === 'dashboard' || view === 'device-detail') && (
+      {(view === 'dashboard' || view === 'device-detail') && !isNavSidebarOpen && (
         <FloodOverviewDrawer
           deviceData={data}
           isSimulationMode={isSimulationMode}
@@ -3952,7 +3952,7 @@ const App = () => {
       )}
 
       {/* ─── Panel Kontrol Simulasi (Floating, hanya di dashboard/device-detail) */}
-      {(view === 'dashboard' || view === 'device-detail') && (
+      {(view === 'dashboard' || view === 'device-detail') && !isNavSidebarOpen && (
         <SimulationControlPanel
           isSimulationMode={isSimulationMode}
           setIsSimulationMode={setIsSimulationMode}
@@ -3965,7 +3965,7 @@ const App = () => {
       )}
 
       {/* ─── Tombol Floating: Lokasi Saya (GPS Locator dengan Live Continuous Tracking) ─── */}
-      {(view === 'dashboard' || view === 'device-detail') && (
+      {(view === 'dashboard' || view === 'device-detail') && !isNavSidebarOpen && (
         <UserLocationFloatingButton
           onLocateUser={handleLocateUser}
           isLocating={isLocating}
@@ -3975,7 +3975,7 @@ const App = () => {
       )}
 
       {/* ─── Floating Card: Status Deteksi Lokasi & Cek Rute Aman Banjir ── */}
-      {(view === 'dashboard' || view === 'device-detail') && (
+      {(view === 'dashboard' || view === 'device-detail') && !isNavSidebarOpen && (
         <RouteFloodNavigationCard
           userLocation={userLocation}
           userSafety={userSafety}

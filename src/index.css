@@ -1603,3 +1603,311 @@ td {
 .geofence-emergency-banner {
   animation: bounceInDown 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FLOATING MAP CONTROLS & WIDGETS (DESKTOP & MOBILE RESPONSIVE)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* 1. Panel Simulasi (SimulationControlPanel) */
+.flood-sim-panel {
+  position: absolute;
+  bottom: 85px;
+  right: 14px;
+  z-index: 995;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 12px 14px;
+  min-width: 230px;
+  max-width: 260px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  color: #f1f5f9;
+  font-size: 0.8rem;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.flood-sim-panel.collapsed {
+  padding: 8px 12px;
+  min-width: auto;
+  max-width: none;
+}
+
+/* 2. Tombol Floating GPS (UserLocationFloatingButton) */
+.user-gps-floating-btn-wrap {
+  position: absolute;
+  bottom: 140px;
+  right: 16px;
+  z-index: 995;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.user-gps-live-badge {
+  background: rgba(2, 132, 199, 0.95);
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  animation: fadeIn 0.2s;
+}
+
+.user-gps-main-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+.user-gps-main-btn:active {
+  transform: scale(0.92);
+}
+
+/* 3. Laci Ringkasan Ketinggian Air (FloodOverviewDrawer) */
+.flood-overview-drawer-wrap {
+  position: absolute;
+  bottom: 85px;
+  left: 14px;
+  z-index: 995;
+  max-width: 320px;
+  font-family: inherit;
+  transition: all 0.25s ease;
+}
+
+.flood-overview-toggle-btn {
+  background: rgba(15, 23, 42, 0.94);
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 9999px;
+  padding: 7px 14px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.flood-overview-toggle-btn:active {
+  transform: scale(0.96);
+}
+
+.flood-overview-sheet {
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid #334155;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  width: 290px;
+  animation: fadeIn 0.2s;
+}
+
+/* 4. Floating Card Navigasi Rute */
+.route-navigation-card {
+  position: absolute;
+  top: 74px;
+  left: 12px;
+  right: 12px;
+  max-width: 420px;
+  margin: 0 auto;
+  z-index: 996;
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  color: #f8fafc;
+  overflow: hidden;
+  font-size: 0.8rem;
+  animation: fadeIn 0.2s;
+}
+
+/* 5. Bar Penandaan Jalan di Peta */
+.road-drawing-floating-bar {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10005;
+  background: rgba(15, 23, 42, 0.96);
+  border: 2px solid #38bdf8;
+  border-radius: 16px;
+  padding: 10px 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  backdrop-filter: blur(10px);
+  max-width: 92vw;
+  animation: fadeIn 0.2s;
+}
+
+/* 6. Modal Edit Range */
+.edit-range-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10010;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.edit-range-modal-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 470px;
+  max-height: 90vh;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  color: #f8fafc;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MOBILE SCREEN OPTIMIZATION (max-width: 768px)
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Pastikan Sidebar berada di atas layer floating apapun saat terbuka */
+  .dashboard-sidebar {
+    z-index: 1005 !important;
+  }
+
+  /* Susunan Rapi Tombol-Tombol di Atas Bar Bawah (bottom: 68px) */
+  .user-gps-floating-btn-wrap {
+    position: fixed !important;
+    bottom: 68px !important;
+    right: 12px !important;
+    z-index: 995 !important;
+  }
+
+  .user-gps-main-btn {
+    width: 42px !important;
+    height: 42px !important;
+  }
+
+  /* Panel Simulasi di HP: Berada rapi di atas tombol GPS */
+  .flood-sim-panel.collapsed {
+    position: fixed !important;
+    bottom: 118px !important;
+    right: 12px !important;
+    z-index: 995 !important;
+    padding: 6px 10px !important;
+    border-radius: 9999px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+  }
+
+  /* Saat Simulasi dibuka di HP: Melebar rapi seperti Bottom Card */
+  .flood-sim-panel.expanded {
+    position: fixed !important;
+    bottom: 68px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    z-index: 1002 !important;
+    border-radius: 16px !important;
+    padding: 12px 14px !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8) !important;
+  }
+
+  /* Laci Pantau Ketinggian Air di HP: Di pojok kiri bawah, sejajar GPS */
+  .flood-overview-drawer-wrap {
+    position: fixed !important;
+    bottom: 68px !important;
+    left: 10px !important;
+    z-index: 995 !important;
+    max-width: none !important;
+  }
+
+  .flood-overview-toggle-btn {
+    padding: 6px 12px !important;
+    font-size: 0.72rem !important;
+  }
+
+  /* Saat daftar air dibuka di HP: Tampil rapi sebagai bottom sheet */
+  .flood-overview-drawer-wrap.open .flood-overview-sheet {
+    position: fixed !important;
+    bottom: 68px !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 48vh !important;
+    z-index: 1002 !important;
+    border-radius: 16px !important;
+  }
+
+  /* Card Navigasi Rute di HP */
+  .route-navigation-card {
+    position: fixed !important;
+    top: 60px !important;
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+    max-width: none !important;
+    z-index: 996 !important;
+  }
+
+  /* Floating Bar Penandaan Jalan di HP */
+  .road-drawing-floating-bar {
+    position: fixed !important;
+    top: 60px !important;
+    left: 8px !important;
+    right: 8px !important;
+    transform: none !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 8px 10px !important;
+    border-radius: 12px !important;
+    gap: 6px !important;
+  }
+
+  /* Modal Edit Range di HP */
+  .edit-range-modal-overlay {
+    padding: 8px !important;
+    align-items: flex-end !important;
+  }
+
+  .edit-range-modal-card {
+    max-height: 88vh !important;
+    border-radius: 20px 20px 10px 10px !important;
+    margin-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+
+  /* Banner Darurat di HP */
+  .geofence-emergency-banner {
+    top: 58px !important;
+    left: 8px !important;
+    right: 8px !important;
+    transform: none !important;
+    width: auto !important;
+    padding: 10px 12px !important;
+    border-radius: 14px !important;
+  }
+}

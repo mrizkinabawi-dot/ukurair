@@ -880,53 +880,22 @@ export const UserLocationFloatingButton = ({
   userLocation
 }) => {
   return (
-    <div style={{
-      position: 'absolute',
-      bottom: '150px',
-      right: '16px',
-      zIndex: 998,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'flex-end',
-      gap: '6px'
-    }}>
+    <div className="user-gps-floating-btn-wrap">
       {/* Tooltip / Label status tracking */}
       {isTrackingLive && (
-        <div style={{
-          background: 'rgba(2, 132, 199, 0.95)',
-          color: '#ffffff',
-          fontSize: '0.68rem',
-          fontWeight: 700,
-          padding: '2px 8px',
-          borderRadius: '9999px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          animation: 'fadeIn 0.2s'
-        }}>
+        <div className="user-gps-live-badge">
           <Radio size={11} className="animate-pulse" />
-          <span>GPS Aktif (Live)</span>
+          <span>GPS Aktif</span>
         </div>
       )}
 
       <button
         onClick={onLocateUser}
         title={isTrackingLive ? 'Pusatkan ke Posisi GPS Saya' : 'Aktifkan Deteksi Posisi GPS Saya'}
+        className="user-gps-main-btn"
         style={{
-          width: '46px',
-          height: '46px',
-          borderRadius: '50%',
           background: userLocation ? '#0284c7' : 'rgba(15, 23, 42, 0.95)',
           border: `2px solid ${userLocation ? '#38bdf8' : '#334155'}`,
-          color: '#ffffff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 4px 18px rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(8px)',
-          transition: 'all 0.2s ease',
         }}
       >
         {isLocating ? (
@@ -940,7 +909,6 @@ export const UserLocationFloatingButton = ({
 };
 
 // ─── Komponen: Ringkasan Ketinggian Air Seluruh Wilayah (Untuk User di Luar Area) ───
-// "user yang di luar wilaayah bisa lihat di bagian web kalau ketinggian air di wilayah ini segini dan wilayah lai segini gitu"
 export const FloodOverviewDrawer = ({
   deviceData = [],
   isSimulationMode = false,
@@ -960,49 +928,18 @@ export const FloodOverviewDrawer = ({
   });
 
   return (
-    <div style={{
-      position: 'absolute',
-      bottom: '88px',
-      left: '14px',
-      zIndex: 998,
-      maxWidth: '320px',
-      fontFamily: 'inherit'
-    }}>
+    <div className={`flood-overview-drawer-wrap ${isOpen ? 'open' : 'closed'}`}>
       {!isOpen ? (
         <button
           onClick={() => setIsOpen(true)}
-          style={{
-            background: 'rgba(15, 23, 42, 0.94)',
-            color: '#f8fafc',
-            border: '1px solid #334155',
-            borderRadius: '9999px',
-            padding: '7px 14px',
-            fontSize: '0.76rem',
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-            backdropFilter: 'blur(8px)',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease'
-          }}
+          className="flood-overview-toggle-btn"
         >
           <Waves size={15} color="#38bdf8" />
-          <span>Pantau Ketinggian Air ({deviceData.length} Wilayah)</span>
+          <span className="overview-btn-text">Pantau Air ({deviceData.length})</span>
           <ChevronUp size={14} color="#94a3b8" />
         </button>
       ) : (
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.97)',
-          border: '1px solid #334155',
-          borderRadius: '14px',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(12px)',
-          overflow: 'hidden',
-          width: '290px',
-          animation: 'fadeIn 0.2s'
-        }}>
+        <div className="flood-overview-sheet">
           {/* Header */}
           <div style={{
             padding: '9px 12px',
@@ -1114,19 +1051,12 @@ export const RouteFloodNavigationCard = ({
 }) => {
   const [minimized, setMinimized] = useState(false);
 
-  // Jika tidak ada lokasi user dan tidak ada tujuan, sembunyikan card agar peta bersih
-  if (!userLocation && !searchedDestination) return null;
+  // HANYA tampilkan jika pengguna sedang mencari rute perjalanan atau ada rute aktif
+  // Tidak memblokir layar ponsel saat pengguna hanya mengaktifkan GPS sendiri
+  if (!searchedDestination && !activeRoute) return null;
 
   return (
-    <div style={{
-      position: 'absolute',
-      top: '74px',
-      left: '12px',
-      right: '12px',
-      maxWidth: '420px',
-      margin: '0 auto',
-      zIndex: 999,
-      background: 'rgba(15, 23, 42, 0.95)',
+    <div className="route-navigation-card" style={{
       border: `1px solid ${
         routeSafety && !routeSafety.isSafe
           ? '#ef4444'
@@ -1134,13 +1064,6 @@ export const RouteFloodNavigationCard = ({
           ? '#ef4444'
           : '#334155'
       }`,
-      borderRadius: '14px',
-      boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
-      backdropFilter: 'blur(10px)',
-      color: '#f8fafc',
-      overflow: 'hidden',
-      fontSize: '0.8rem',
-      animation: 'fadeIn 0.2s'
     }}>
       {/* Header Bar */}
       <div style={{

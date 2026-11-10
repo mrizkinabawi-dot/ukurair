@@ -289,32 +289,24 @@ export const SimulationControlPanel = ({
   setShowZones,
   onOpenEditRange
 }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  // Pada layar ponsel (mobile), defaultkan ke tertutup (collapsed) agar tidak memenuhi layar
+  const [collapsed, setCollapsed] = useState(() => {
+    return typeof window !== 'undefined' && window.innerWidth <= 768;
+  });
 
   return (
     <div
-      className="flood-sim-panel"
-      style={{
-        position: 'absolute',
-        bottom: '85px',
-        right: '14px',
-        zIndex: 999,
-        background: 'rgba(15,23,42,0.95)',
-        border: '1px solid #334155',
-        borderRadius: '12px',
-        padding: collapsed ? '8px 12px' : '12px 14px',
-        minWidth: collapsed ? 'auto' : '230px',
-        maxWidth: '260px',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(8px)',
-        color: '#f1f5f9',
-        fontSize: '0.8rem',
-      }}
+      className={`flood-sim-panel ${collapsed ? 'collapsed' : 'expanded'}`}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.82rem' }}>
           <Layers size={16} color="#38bdf8" />
           <span>Simulasi Range Air</span>
+          {isSimulationMode && (
+            <span style={{ fontSize: '0.62rem', background: '#0284c7', color: '#fff', padding: '1px 5px', borderRadius: '4px', fontWeight: 700 }}>
+              {simulatedValue}cm
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
           <button
@@ -623,38 +615,20 @@ export const EditRangeModal = ({
   // Jika sedang mode klik di peta untuk menandai jalan, tampilkan floating bar ringkas di atas peta
   if (isDrawingRoad) {
     return (
-      <div style={{
-        position: 'fixed',
-        top: '16px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 99999,
-        background: 'rgba(15, 23, 42, 0.96)',
-        border: '2px solid #38bdf8',
-        borderRadius: '16px',
-        padding: '12px 18px',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.8)',
-        color: '#f8fafc',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        backdropFilter: 'blur(10px)',
-        maxWidth: '92vw',
-        animation: 'fadeIn 0.2s'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '1.2rem' }}>🛣️</span>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#38bdf8' }}>
-              Mode Klik Peta: Tandai Kontur Jalan
+      <div className="road-drawing-floating-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <span style={{ fontSize: '1.2rem', flexShrink: 0 }}>🛣️</span>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: '0.82rem', color: '#38bdf8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Mode Klik: Tandai Jalan
             </div>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
-              Klik langsung pada jalan di peta untuk menambah titik kelokan ({activeDrawPoints?.length || 0} titik)
+            <div style={{ fontSize: '0.66rem', color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Klik jalan di peta ({activeDrawPoints?.length || 0} titik)
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button
             onClick={() => {
               if (activeDrawPoints && activeDrawPoints.length > 1) {
@@ -663,19 +637,19 @@ export const EditRangeModal = ({
             }}
             disabled={!activeDrawPoints || activeDrawPoints.length <= 1}
             style={{
-              padding: '6px 10px',
-              borderRadius: '8px',
+              padding: '5px 8px',
+              borderRadius: '6px',
               background: '#334155',
               border: 'none',
               color: '#f8fafc',
-              fontSize: '0.75rem',
+              fontSize: '0.72rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '3px'
             }}
           >
-            <Undo2 size={13} /> Undo
+            <Undo2 size={12} /> Undo
           </button>
 
           <button
@@ -684,19 +658,19 @@ export const EditRangeModal = ({
               setActiveDrawPoints([startPt]);
             }}
             style={{
-              padding: '6px 10px',
-              borderRadius: '8px',
+              padding: '5px 8px',
+              borderRadius: '6px',
               background: '#334155',
               border: 'none',
               color: '#fca5a5',
-              fontSize: '0.75rem',
+              fontSize: '0.72rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '3px'
             }}
           >
-            <RotateCcw size={13} /> Reset
+            <RotateCcw size={12} /> Reset
           </button>
 
           <button
@@ -704,20 +678,20 @@ export const EditRangeModal = ({
               setIsDrawingRoad(false);
             }}
             style={{
-              padding: '6px 14px',
-              borderRadius: '8px',
+              padding: '5px 12px',
+              borderRadius: '6px',
               background: '#0284c7',
               border: 'none',
               color: '#ffffff',
               fontWeight: 700,
-              fontSize: '0.78rem',
+              fontSize: '0.74rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '5px'
+              gap: '4px'
             }}
           >
-            <Check size={14} /> Selesai Tandai
+            <Check size={13} /> Selesai
           </button>
         </div>
       </div>
@@ -725,30 +699,8 @@ export const EditRangeModal = ({
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      zIndex: 99999,
-      background: 'rgba(0, 0, 0, 0.75)',
-      backdropFilter: 'blur(5px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '14px'
-    }}>
-      <div style={{
-        background: '#0f172a',
-        border: '1px solid #334155',
-        borderRadius: '16px',
-        width: '100%',
-        maxWidth: '470px',
-        maxHeight: '92vh',
-        boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
-        color: '#f8fafc',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+    <div className="edit-range-modal-overlay">
+      <div className="edit-range-modal-card">
         {/* Header Modal */}
         <div style={{
           padding: '12px 18px',

@@ -7,6 +7,15 @@ import {
   useFloodZones,
 } from './FloodSimulation';
 import {
+  UserLocationMapLayer,
+  UserLocationFloatingButton,
+  RouteFloodNavigationCard,
+  createUserLocationIcon,
+  fetchOsrmRoute,
+  checkRouteFloodSafety,
+  checkUserLocationSafety
+} from './UserLocationRouting';
+import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine
 } from 'recharts';
 import {
@@ -1181,6 +1190,101 @@ const App = () => {
   const [isDrawingRoad, setIsDrawingRoad] = useState(false);
   const [activeDrawPoints, setActiveDrawPoints] = useState([]);
   const { zones: floodZones, loadingZones, saveZone, deleteZone } = useFloodZones();
+
+  // ─── State Deteksi Lokasi Pengguna & Cek Rute Aman Banjir ────────────────
+  const [userLocation, setUserLocation] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [activeRoute, setActiveRoute] = useState(null);
+  const [routeSafety, setRouteSafety] = useState(null);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const userLocationIcon = useMemo(() => createUserLocationIcon(), []);
+
+  // Evaluasi otomatis keamanan lokasi pengguna saat ini terhadap banjir
+  const userSafety = useMemo(() => {
+    if (!userLocation) return { status: 'unknown' };
+    return checkUserLocationSafety(userLocation.lat, userLocation.lng, floodZones, data);
+  }, [userLocation, floodZones, data]);
+
+  // Handler temukan posisi GPS pengguna
+  const handleLocateUser = () => {
+    if (!navigator.geolocation) {
+      alert('Browser Anda tidak mendukung deteksi lokasi (Geolocation).');
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        const { latitude, longitude, accuracy } = pos.coords;
+        const loc = { lat: latitude, lng: longitude, accuracy };
+        setUserLocation(loc);
+        setMainMapTarget({ lat: latitude, lng: longitude, zoom: 16, _ts: Date.now() });
+      },
+      (err) => {
+        setIsLocating(false);
+        let msg = 'Gagal mendeteksi lokasi GPS.';
+        if (err.code === 1) msg = 'Izin lokasi ditolak. Silakan aktifkan izin lokasi di browser Anda.';
+        else if (err.code === 2) msg = 'Sinyal lokasi tidak tersedia.';
+        else if (err.code === 3) msg = 'Waktu deteksi lokasi habis (timeout).';
+        alert(msg);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  };
+
+  // Jalankan analisis rute OSRM dan cek persilangan banjir
+  const runRouteAnalysis = async (startLoc, dest) => {
+    setIsLoadingRoute(true);
+    try {
+      const routeData = await fetchOsrmRoute(startLoc.lat, startLoc.lng, dest.lat, dest.lng);
+      setActiveRoute(routeData);
+      const safety = checkRouteFloodSafety(routeData.coordinates, floodZones, data);
+      setRouteSafety(safety);
+    } catch (e) {
+      alert('Gagal menganalisis rute jalan: ' + (e?.message || 'Error'));
+    } finally {
+      setIsLoadingRoute(false);
+    }
+  };
+
+  // Handler hitung rute dari posisi pengguna ke tujuan
+  const handleCalculateRoute = async (targetDest) => {
+    const dest = targetDest || searchedDestination;
+    if (!dest) {
+      alert('Silakan cari tujuan perjalanan terlebih dahulu.');
+      return;
+    }
+
+    if (!userLocation) {
+      // Jika posisi GPS pengguna belum ada, minta otomatis
+      if (!navigator.geolocation) {
+        alert('Browser tidak mendukung deteksi lokasi.');
+        return;
+      }
+      setIsLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          setIsLocating(false);
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+          setUserLocation(loc);
+          await runRouteAnalysis(loc, dest);
+        },
+        () => {
+          setIsLocating(false);
+          alert('Perlu izin lokasi GPS Anda untuk menganalisis rute dari tempat Anda berada.');
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+      return;
+    }
+
+    await runRouteAnalysis(userLocation, dest);
+  };
+
+  const handleCancelRoute = () => {
+    setActiveRoute(null);
+    setRouteSafety(null);
+  };
 
   // Tutup dropdown sugesti pencarian saat user klik di luar container
   useEffect(() => {
@@ -3488,25 +3592,83 @@ const App = () => {
                     <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '4px 0 8px', lineHeight: 1.3 }}>
                       {searchedDestination.fullAddress}
                     </p>
-                    <button
-                      onClick={() => setSearchedDestination(null)}
-                      style={{
-                        background: '#fee2e2',
-                        border: '1px solid #fca5a5',
-                        color: '#dc2626',
-                        borderRadius: '4px',
-                        padding: '2px 8px',
-                        fontSize: '0.7rem',
-                        cursor: 'pointer',
-                        fontWeight: 600
-                      }}
-                    >
-                      Hapus Pin Tujuan
-                    </button>
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                      <button
+                        onClick={() => handleCalculateRoute(searchedDestination)}
+                        style={{
+                          background: '#0284c7',
+                          border: 'none',
+                          color: '#ffffff',
+                          borderRadius: '4px',
+                          padding: '3px 8px',
+                          fontSize: '0.7rem',
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px'
+                        }}
+                      >
+                        🚗 Cek Rute Aman
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSearchedDestination(null);
+                          handleCancelRoute();
+                        }}
+                        style={{
+                          background: '#fee2e2',
+                          border: '1px solid #fca5a5',
+                          color: '#dc2626',
+                          borderRadius: '4px',
+                          padding: '3px 8px',
+                          fontSize: '0.7rem',
+                          cursor: 'pointer',
+                          fontWeight: 600
+                        }}
+                      >
+                        Hapus Pin
+                      </button>
+                    </div>
                   </div>
                 </Popup>
               </Marker>
             )}
+
+            {/* Marker Posisi Pengguna GPS (Titik Biru Radar Pulsing) */}
+            {userLocation && (
+              <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}>
+                <Popup autoPan={false}>
+                  <div style={{ textAlign: 'center', padding: '0.2rem', minWidth: '160px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0284c7', marginBottom: '2px' }}>
+                      📍 Posisi Anda Saat Ini
+                    </div>
+                    <div style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: userSafety?.status === 'danger' ? '#ef4444' : userSafety?.status === 'warning' ? '#f59e0b' : '#10b981',
+                      margin: '4px 0'
+                    }}>
+                      {userSafety?.status === 'danger'
+                        ? '🔴 Terdeteksi di Area Banjir!'
+                        : userSafety?.status === 'warning'
+                        ? '🟡 Waspada Dekat Titik Air'
+                        : '🟢 Lokasi Anda Aman'}
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
+                      Akurasi GPS: ±{Math.round(userLocation.accuracy || 20)} meter
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+
+            {/* Layer Garis Rute Jalan OSRM & Analisis Keamanan */}
+            <UserLocationMapLayer
+              userLocation={userLocation}
+              activeRoute={activeRoute}
+              routeSafety={routeSafety}
+            />
 
             {data.map(device => {
               const lat = device.lat || 1.128;
@@ -3597,7 +3759,7 @@ const App = () => {
                           </>
                         );
                       })()}
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '6px' }}>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginTop: '6px', flexWrap: 'wrap' }}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -3618,6 +3780,30 @@ const App = () => {
                           }}
                         >
                           <BarChart3 size={13} /> Lihat Grafik
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const dest = { title: device.name, fullAddress: 'Titik Pantau IoT', lat: device.lat || 1.128, lng: device.lng || 104.053 };
+                            setSearchedDestination(dest);
+                            handleCalculateRoute(dest);
+                          }}
+                          title="Cek apakah jalur rute ke titik pantau ini ada banjir di jalan"
+                          style={{
+                            background: 'rgba(2, 132, 199, 0.2)',
+                            color: '#38bdf8',
+                            border: '1px solid #0284c7',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Navigation size={13} /> Cek Rute
                         </button>
                         {isAdminUser && (
                           <button
@@ -3685,6 +3871,30 @@ const App = () => {
           setSimulatedValue={setSimulatedValue}
           showZones={showFloodZones}
           setShowZones={setShowFloodZones}
+        />
+      )}
+
+      {/* ─── Tombol Floating: Lokasi Saya (GPS Locator) ─────────────────── */}
+      {(view === 'dashboard' || view === 'device-detail') && (
+        <UserLocationFloatingButton
+          onLocateUser={handleLocateUser}
+          isLocating={isLocating}
+          userLocation={userLocation}
+        />
+      )}
+
+      {/* ─── Floating Card: Status Deteksi Lokasi & Cek Rute Aman Banjir ── */}
+      {(view === 'dashboard' || view === 'device-detail') && (
+        <RouteFloodNavigationCard
+          userLocation={userLocation}
+          userSafety={userSafety}
+          searchedDestination={searchedDestination}
+          activeRoute={activeRoute}
+          routeSafety={routeSafety}
+          isLoadingRoute={isLoadingRoute}
+          onCalculateRoute={() => handleCalculateRoute(searchedDestination)}
+          onCancelRoute={handleCancelRoute}
+          onLocateUser={handleLocateUser}
         />
       )}
 

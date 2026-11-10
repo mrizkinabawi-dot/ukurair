@@ -639,7 +639,7 @@ export const GeofenceEmergencyAlert = ({
 };
 
 // ─── Komponen Layer Peta: Floating Badge Ketinggian Air Seluruh Wilayah ──────
-// "user yang di luar wilaayah bisa lihat di bagian web kalau ketinggian air di wilayah ini segini dan wilayah lai segini gitu"
+// Zoom-Responsive: Semakin zoom out semakin kecil, jika terlalu jauh (zoom < 13) disembunyikan otomatis
 export const FloodTrafficBadgeLayer = ({
   deviceData = [],
   floodZones = [],
@@ -648,7 +648,36 @@ export const FloodTrafficBadgeLayer = ({
   onSelectDevice
 }) => {
   const map = useMap();
+  const [currentZoom, setCurrentZoom] = useState(() => map.getZoom());
   const markersRef = useRef([]);
+
+  // Pantau perubahan zoom peta secara real-time
+  useEffect(() => {
+    const handleZoom = () => {
+      setCurrentZoom(map.getZoom());
+    };
+    map.on('zoomend', handleZoom);
+    map.on('zoom', handleZoom);
+    return () => {
+      map.off('zoomend', handleZoom);
+      map.off('zoom', handleZoom);
+    };
+  }, [map]);
+
+  // Helper pemendek nama lokasi agar tidak memanjang
+  const getShortName = (name) => {
+    if (!name) return '';
+    const lower = name.toLowerCase();
+    if (lower.includes('politeknik')) return 'Polibatam';
+    if (lower.includes('marina')) return 'Marina';
+    if (lower.includes('batu aji')) return 'Batu Aji';
+    if (lower.includes('tiban')) return 'Tiban';
+    if (lower.includes('nagoya')) return 'Nagoya';
+    if (lower.includes('batam centre') || lower.includes('batam center')) return 'Batam Centre';
+    if (lower.includes('sekupang')) return 'Sekupang';
+    const clean = name.replace(/^(Jalan|Jl\.)\s+/i, '').split(/[-–,]/)[0].trim();
+    return clean.length > 10 ? clean.slice(0, 9) + '..' : clean;
+  };
 
   useEffect(() => {
     // Bersihkan marker lama
@@ -656,6 +685,33 @@ export const FloodTrafficBadgeLayer = ({
       try { map.removeLayer(m); } catch (_) {}
     });
     markersRef.current = [];
+
+    // JIKA TERLALU JAUH (zoom < 13) -> SEMBUNYIKAN TOTAL AGAR TIDAK MENGGANGGU
+    if (currentZoom < 13) {
+      return;
+    }
+
+    // Skala ukuran badge responsif terhadap zoom:
+    // - Zoom >= 16: Skala 0.95 (tampil nama ringkas + level cm)
+    // - Zoom 15: Skala 0.82 (tampil nama ringkas + level cm)
+    // - Zoom 14: Skala 0.72 (hanya tampil titik warna + level cm, lebih kecil)
+    // - Zoom 13: Skala 0.60 (mini pill kecil)
+    let scale = 0.95;
+    let showName = true;
+
+    if (currentZoom >= 16) {
+      scale = 0.95;
+      showName = true;
+    } else if (currentZoom === 15) {
+      scale = 0.82;
+      showName = true;
+    } else if (currentZoom === 14) {
+      scale = 0.72;
+      showName = false; // Ringkas: hanya dot + cm
+    } else {
+      scale = 0.60;
+      showName = false;
+    }
 
     // Kumpulkan titik-titik pantau yang valid
     const items = [];
@@ -665,23 +721,18 @@ export const FloodTrafficBadgeLayer = ({
       const level = isSimulationMode ? simulatedValue : (Number(dev.water_level) || 0);
       const isOnline = dev.isOnline !== false;
 
-      // Status Traffic Style
       let statusColor = '#22c55e'; // Hijau Aman (< 20 cm)
       let statusBadge = 'Aman';
-      let dotEmoji = '🟢';
 
       if (!isOnline && !isSimulationMode) {
         statusColor = '#94a3b8';
         statusBadge = 'Offline';
-        dotEmoji = '⚪';
       } else if (level >= 50) {
         statusColor = '#ef4444'; // Merah Bahaya (>= 50 cm)
         statusBadge = 'Bahaya';
-        dotEmoji = '🔴';
       } else if (level >= 20) {
         statusColor = '#f59e0b'; // Oranye/Kuning Waspada (20-49 cm)
         statusBadge = 'Waspada';
-        dotEmoji = '🟠';
       }
 
       items.push({
@@ -692,52 +743,54 @@ export const FloodTrafficBadgeLayer = ({
         level,
         statusColor,
         statusBadge,
-        dotEmoji,
         device: dev
       });
     });
 
-    // Render Badge Mengambang seperti label jalan Google Maps
+    // Render Badge Mengambang Mini & Responsif
     items.forEach(item => {
+      const shortName = getShortName(item.name);
+
       const icon = L.divIcon({
         className: 'flood-traffic-badge-marker',
         html: `
           <div style="
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            background: rgba(15, 23, 42, 0.92);
+            gap: 3.5px;
+            background: rgba(15, 23, 42, 0.88);
             color: #ffffff;
-            border: 1.5px solid ${item.statusColor};
+            border: 1px solid ${item.statusColor};
             border-radius: 9999px;
-            padding: 3px 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+            padding: 1.5px 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.45);
             font-family: inherit;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             white-space: nowrap;
-            backdrop-filter: blur(6px);
-            cursor: pointer;
-            transform: translate(-50%, -36px);
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            backdrop-filter: blur(4px);
+            pointer-events: none;
+            transform: translate(-50%, -28px) scale(${scale});
+            transform-origin: bottom center;
+            transition: transform 0.2s ease, opacity 0.2s ease;
           ">
             <span style="
-              width: 8px;
-              height: 8px;
+              width: 6px;
+              height: 6px;
               border-radius: 50%;
               background: ${item.statusColor};
-              box-shadow: 0 0 6px ${item.statusColor};
+              box-shadow: 0 0 4px ${item.statusColor};
               flex-shrink: 0;
             "></span>
-            <span style="max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: #f1f5f9;">
-              ${item.name.replace(/^Jalan\s+|^Jl\.\s+/i, '')}
-            </span>
+            ${showName && shortName ? `
+              <span style="color: #cbd5e1; font-size: 9px; margin-right: 1px;">
+                ${shortName}
+              </span>
+            ` : ''}
             <span style="
-              background: ${item.statusColor}22;
               color: ${item.statusColor};
-              padding: 1px 5px;
-              border-radius: 4px;
               font-weight: 800;
+              font-size: 9.5px;
             ">
               ${item.level} cm
             </span>
@@ -747,13 +800,7 @@ export const FloodTrafficBadgeLayer = ({
         iconAnchor: [0, 0]
       });
 
-      const marker = L.marker([item.lat, item.lng], { icon, zIndexOffset: 200 });
-      marker.on('click', () => {
-        if (typeof onSelectDevice === 'function') {
-          onSelectDevice(item.device);
-        }
-      });
-
+      const marker = L.marker([item.lat, item.lng], { icon, zIndexOffset: 50 });
       marker.addTo(map);
       markersRef.current.push(marker);
     });
@@ -764,7 +811,7 @@ export const FloodTrafficBadgeLayer = ({
       });
       markersRef.current = [];
     };
-  }, [deviceData, isSimulationMode, simulatedValue, map, onSelectDevice]);
+  }, [deviceData, isSimulationMode, simulatedValue, currentZoom, map]);
 
   return null;
 };

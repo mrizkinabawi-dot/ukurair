@@ -1549,12 +1549,12 @@ td {
 
 
 /* ═══════════════════════════════════════════════════════════════════════
-   GPS USER LOCATION & ROUTING PULSE ANIMATION
+   GPS USER LOCATION, TRAFFIC FLOOD BADGES & EMERGENCY ALERT ANIMATION
    ═══════════════════════════════════════════════════════════════════════ */
 @keyframes user-gps-pulse {
   0% {
     transform: scale(0.6);
-    opacity: 0.9;
+    opacity: 0.95;
   }
   70% {
     transform: scale(2.4);
@@ -1569,4 +1569,37 @@ td {
 .user-gps-marker {
   background: transparent !important;
   border: none !important;
+}
+
+.flood-traffic-badge-marker {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: auto !important;
+}
+
+.flood-traffic-badge-marker:hover div {
+  transform: translate(-50%, -40px) scale(1.08) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6) !important;
+}
+
+@keyframes bounceInDown {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -60px) scale(0.92);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, 8px) scale(1.02);
+  }
+  80% {
+    transform: translate(-50%, -3px) scale(0.99);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.geofence-emergency-banner {
+  animation: bounceInDown 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }

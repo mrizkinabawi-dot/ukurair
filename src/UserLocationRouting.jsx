@@ -1,11 +1,15 @@
 /**
  * UserLocationRouting.jsx
  * 
- * Fitur Deteksi Lokasi Pengguna & Cek Rute Aman Banjir:
- * 1. Deteksi GPS pengguna (marker pulsing dot seperti Google Maps)
- * 2. Cek apakah pengguna berada di dalam / dekat zona banjir
- * 3. Ambil rute jalan OSRM dari posisi pengguna ke tujuan
- * 4. Analisis apakah rute melewati titik banjir / jalan tergenang di depan
+ * Sistem Deteksi Posisi Pengguna, Lalu Lintas Banjir (Google Maps Style) & Alert Geofence:
+ * 1. Live GPS tracking pengguna (Marker pulsing radar blue dot seperti Google Maps)
+ * 2. Visualisasi warna jalan ala Google Maps Traffic (Hijau = Aman, Kuning/Oranye = Waspada, Merah = Bahaya/Macet Banjir)
+ * 3. Geofence Web Emergency Alert: Notifikasi HANYA berbunyi/muncul saat pengguna MASUK kawasan banjir aktif
+ *    (Pengguna di luar wilayah banjir TIDAK diganggu notifikasi)
+ * 4. Badge Ketinggian Air Mengambang di Peta: Pengguna di luar wilayah bisa langsung melihat
+ *    ketinggian air tiap daerah (misal: "Jl. Marina: 68 cm (Merah)")
+ * 5. Ringkasan Ketinggian Air Seluruh Wilayah (Traffic Legend / Overview Drawer)
+ * 6. Coming Soon Badge: Notifikasi Telegram & SMS
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -13,12 +17,14 @@ import { useMap } from 'react-leaflet';
 import L from 'leaflet';
 import {
   Navigation, Crosshair, AlertTriangle, CheckCircle2,
-  MapPin, ShieldAlert, X, ArrowRight, Route, Loader2, Info
+  MapPin, ShieldAlert, X, ArrowRight, Route, Loader2, Info,
+  Volume2, VolumeX, Bell, BellRing, ChevronDown, ChevronUp,
+  Radio, Waves, Car, Compass, ExternalLink, ShieldCheck
 } from 'lucide-react';
 
 // ─── Formula Jarak Haversine (dalam meter) ──────────────────────────────────
 export const getDistanceMeters = (lat1, lon1, lat2, lon2) => {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
+  if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined) return 999999;
   const R = 6371000; // Radius bumi (meter)
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -32,35 +38,143 @@ export const getDistanceMeters = (lat1, lon1, lat2, lon2) => {
   return Math.round(R * c);
 };
 
-// ─── Icon Marker Posisi Pengguna (Pulsing Radar Blue Dot) ────────────────────
-export const createUserLocationIcon = () => {
+// ─── Hitung Jarak Tegak Lurus Titik ke Segmen Garis Jalan (Meter) ────────────
+export const distToSegmentMeters = (pLat, pLng, aLat, aLng, bLat, bLng) => {
+  const midLatRad = ((aLat + bLat) / 2) * (Math.PI / 180);
+  const cosLat = Math.cos(midLatRad);
+  const kLat = 111139; // 1 derajat lat ~ 111.1 km
+  const kLng = 111139 * cosLat;
+
+  const px = (pLng - aLng) * kLng;
+  const py = (pLat - aLat) * kLat;
+  const bx = (bLng - aLng) * kLng;
+  const by = (bLat - aLat) * kLat;
+
+  const l2 = bx * bx + by * by;
+  if (l2 === 0) return Math.hypot(px, py);
+
+  let t = (px * bx + py * by) / l2;
+  t = Math.max(0, Math.min(1, t));
+
+  const projX = t * bx;
+  const projY = t * by;
+  return Math.hypot(px - projX, py - projY);
+};
+
+// ─── Cek Apakah Titik Berada di Dalam Poligon (Ray-Casting Algorithm) ───────
+export const isPointInPolygon = (lat, lng, polygon) => {
+  if (!polygon || polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][1], yi = polygon[i][0];
+    const xj = polygon[j][1], yj = polygon[j][0];
+    const intersect = ((yi > lat) !== (yj > lat)) &&
+      (lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+};
+
+// ─── Web Audio API: Bunyi Alarm Darurat Banjir (Acoustic Chime) ──────────────
+export const playEmergencyFloodChime = () => {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    const playBeep = (freq, startOffset, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + startOffset);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime + startOffset);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startOffset + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + startOffset);
+      osc.stop(ctx.currentTime + startOffset + duration);
+    };
+
+    // Nada peringatan 3 ketukan (A5, A5, C6)
+    playBeep(880, 0, 0.14);
+    playBeep(880, 0.18, 0.14);
+    playBeep(1046, 0.36, 0.28);
+  } catch (err) {
+    console.warn('Web Audio warning suppressed:', err);
+  }
+};
+
+// ─── Browser Native Web Notification ─────────────────────────────────────────
+export const sendBrowserFloodNotification = (areaName, waterLevel) => {
+  if (!('Notification' in window)) return;
+  const title = '🚨 AWAS: MEMASUKI AREA BANJIR!';
+  const body = `Anda berada di area genangan banjir ${areaName || 'jalan'} (Ketinggian air: ${waterLevel || '>30'} cm). Harap berhati-hati atau cari rute aman!`;
+
+  if (Notification.permission === 'granted') {
+    try {
+      new Notification(title, { body, icon: '/favicon.ico' });
+    } catch (_) {}
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(perm => {
+      if (perm === 'granted') {
+        try {
+          new Notification(title, { body, icon: '/favicon.ico' });
+        } catch (_) {}
+      }
+    });
+  }
+};
+
+// ─── Icon Marker Posisi Pengguna (Pulsing Radar Blue Dot Google Maps) ────────
+export const createUserLocationIcon = (heading = null) => {
+  const headingTransform = (heading !== null && heading !== undefined)
+    ? `transform: rotate(${heading}deg);`
+    : '';
+
   return L.divIcon({
     className: 'user-gps-marker',
     html: `
-      <div style="position: relative; width: 24px; height: 24px;">
+      <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+        <!-- Pulsing radar wave -->
         <div style="
           position: absolute;
           inset: 0;
           border-radius: 50%;
-          background: rgba(56, 189, 248, 0.4);
+          background: rgba(14, 165, 233, 0.35);
           animation: user-gps-pulse 2s infinite ease-out;
         "></div>
+        <!-- Direction cone if heading available -->
+        ${heading !== null && heading !== undefined ? `
+          <div style="
+            position: absolute;
+            top: -6px;
+            width: 0;
+            height: 0;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 12px solid #0284c7;
+            ${headingTransform}
+          "></div>
+        ` : ''}
+        <!-- Core Blue Dot (Google Maps Style) -->
         <div style="
-          position: absolute;
-          top: 4px;
-          left: 4px;
+          position: relative;
           width: 16px;
           height: 16px;
           border-radius: 50%;
           background: #0284c7;
           border: 3px solid #ffffff;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+          box-shadow: 0 2px 10px rgba(2, 132, 199, 0.8), 0 0 0 2px rgba(2, 132, 199, 0.3);
+          z-index: 2;
         "></div>
       </div>
     `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -14],
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -18],
   });
 };
 
@@ -76,7 +190,6 @@ export const fetchOsrmRoute = async (startLat, startLng, destLat, destLng) => {
     }
 
     const route = data.routes[0];
-    // OSRM mengembalikan [lng, lat], balikkan ke [lat, lng] untuk Leaflet
     const coordinates = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
     const distanceKm = (route.distance / 1000).toFixed(1);
     const durationMin = Math.round(route.duration / 60);
@@ -88,8 +201,7 @@ export const fetchOsrmRoute = async (startLat, startLng, destLat, destLng) => {
       summary: route.legs?.[0]?.summary || 'Jalan Raya'
     };
   } catch (err) {
-    console.warn('OSRM Route fetch error:', err);
-    // Fallback: garis lurus jika OSRM sedang lambat / offline
+    console.warn('OSRM Route fetch fallback:', err);
     return {
       coordinates: [[startLat, startLng], [destLat, destLng]],
       distanceKm: (getDistanceMeters(startLat, startLng, destLat, destLng) / 1000).toFixed(1),
@@ -100,25 +212,22 @@ export const fetchOsrmRoute = async (startLat, startLng, destLat, destLng) => {
 };
 
 // ─── Evaluasi Apakah Rute Melintasi Zona Banjir ──────────────────────────────
-export const checkRouteFloodSafety = (routeCoords, floodZones, deviceData) => {
+export const checkRouteFloodSafety = (routeCoords, floodZones, deviceData, isSimulationMode = false, simulatedValue = 0) => {
   if (!routeCoords || routeCoords.length === 0) return { isSafe: true, floodedPoints: [] };
 
   const floodedPoints = [];
-
-  // 1. Kumpulkan semua area yang saat ini berstatus banjir / siaga / zona air aktif
   const dangerousAreas = [];
 
   // A. Dari perangkat IoT yang airnya sedang naik / siaga
   (deviceData || []).forEach(dev => {
-    const level = Number(dev.water_level) || 0;
+    const level = isSimulationMode ? simulatedValue : (Number(dev.water_level) || 0);
     const isOnline = dev.isOnline !== false;
-    // Anggap bahaya jika air >= 30 cm atau status siaga/waspada
-    if (isOnline && (level >= 30 || String(dev.status).toLowerCase().includes('siaga') || String(dev.status).toLowerCase().includes('waspada'))) {
+    if ((isOnline || isSimulationMode) && (level >= 30 || String(dev.status).toLowerCase().includes('siaga') || String(dev.status).toLowerCase().includes('waspada'))) {
       dangerousAreas.push({
         name: dev.name || 'Titik Sensor',
         lat: dev.lat,
         lng: dev.lng,
-        radius: 120, // meter
+        radius: 120,
         water_level: level,
         type: 'sensor'
       });
@@ -127,52 +236,47 @@ export const checkRouteFloodSafety = (routeCoords, floodZones, deviceData) => {
 
   // B. Dari zona banjir yang dikonfigurasi (Zona 1, 2, 3)
   (floodZones || []).forEach(zone => {
-    if (zone.sub_zones && Array.isArray(zone.sub_zones)) {
-      zone.sub_zones.forEach(sz => {
-        if (sz.enabled !== false && sz.color !== '#22c55e') { // bukan hijau aman
-          // Jika kontur jalan
-          if (sz.type === 'road' && sz.road_points) {
-            sz.road_points.forEach(pt => {
-              dangerousAreas.push({
-                name: `${zone.name || 'Jalan'} - ${sz.name}`,
-                lat: pt[0],
-                lng: pt[1],
-                radius: Number(sz.road_width || 18) * 3,
-                type: 'road',
-                color: sz.color
-              });
-            });
-          } else {
-            const center = sz.center || zone.center || [zone.lat, zone.lng];
-            if (center) {
-              dangerousAreas.push({
-                name: `${zone.name || 'Area'} - ${sz.name}`,
-                lat: center[0],
-                lng: center[1],
-                radius: Number(sz.radius_meter || 100),
-                type: 'zone',
-                color: sz.color
-              });
-            }
-          }
-        }
-      });
-    } else if (zone.enabled !== false && zone.color !== '#22c55e') {
-      const center = zone.center || [zone.lat, zone.lng];
-      if (center) {
-        dangerousAreas.push({
-          name: zone.name || 'Zona Genangan',
-          lat: center[0],
-          lng: center[1],
-          radius: Number(zone.radius_meter || 120),
-          type: 'zone',
-          color: zone.color
+    const checkSub = (sz) => {
+      if (sz.enabled === false) return;
+      const effectiveLevel = isSimulationMode ? simulatedValue : 0;
+      // Berbahaya jika warna merah/oranye atau level simulasi >= 30
+      const isDangerousColor = sz.color === '#ef4444' || sz.color === '#f97316' || sz.color === '#ea580c';
+      if (!isDangerousColor && effectiveLevel < 30) return;
+
+      if (sz.type === 'road' && sz.road_points) {
+        sz.road_points.forEach(pt => {
+          dangerousAreas.push({
+            name: `${zone.name || 'Jalan'} (${sz.name || 'Kontur Jalan'})`,
+            lat: pt[0],
+            lng: pt[1],
+            radius: Number(sz.road_width || 18) * 3,
+            type: 'road',
+            water_level: effectiveLevel || 50
+          });
         });
+      } else {
+        const center = sz.center || zone.center || [zone.lat, zone.lng];
+        if (center) {
+          dangerousAreas.push({
+            name: `${zone.name || 'Wilayah'} (${sz.name || 'Zona'})`,
+            lat: center[0],
+            lng: center[1],
+            radius: Number(sz.radius_meter || 100),
+            type: 'zone',
+            water_level: effectiveLevel || 50
+          });
+        }
       }
+    };
+
+    if (zone.sub_zones && Array.isArray(zone.sub_zones)) {
+      zone.sub_zones.forEach(checkSub);
+    } else {
+      checkSub(zone);
     }
   });
 
-  // 2. Periksa setiap titik pada rute jalan terhadap area berbahaya
+  // Periksa rute jalan terhadap area berbahaya
   for (const pt of routeCoords) {
     for (const area of dangerousAreas) {
       const dist = getDistanceMeters(pt[0], pt[1], area.lat, area.lng);
@@ -196,76 +300,476 @@ export const checkRouteFloodSafety = (routeCoords, floodZones, deviceData) => {
   };
 };
 
-// ─── Evaluasi Posisi Pengguna Saat Ini Terhadap Banjir ───────────────────────
-export const checkUserLocationSafety = (userLat, userLng, floodZones, deviceData) => {
+// ─── Evaluasi Posisi Pengguna Saat Ini Terhadap Banjir (Geofencing Akurat) ────
+// PERATURAN MUTLAK:
+// Hanya return 'danger' jika pengguna SECARA FISIK MASUK ke dalam radius/garis jalan banjir aktif!
+// Pengguna di luar wilayah banjir SELALU aman dan TIDAK menerima notifikasi alarm.
+export const checkUserLocationSafety = (
+  userLat,
+  userLng,
+  floodZones = [],
+  deviceData = [],
+  isSimulationMode = false,
+  simulatedValue = 0
+) => {
   if (!userLat || !userLng) return { status: 'unknown' };
 
-  let nearestFlood = null;
-  let minDistance = 999999;
-  let isInside = false;
+  let activeFloods = [];
 
-  // Cek ke titik sensor
+  // 1. Periksa sensor IoT terdekat
   (deviceData || []).forEach(dev => {
-    const level = Number(dev.water_level) || 0;
+    const level = isSimulationMode ? simulatedValue : (Number(dev.water_level) || 0);
     const isOnline = dev.isOnline !== false;
-    if (isOnline && (level >= 30 || String(dev.status).toLowerCase().includes('siaga'))) {
+    const isHazard = (isOnline || isSimulationMode) && (
+      level >= 30 ||
+      String(dev.status).toLowerCase().includes('siaga') ||
+      String(dev.status).toLowerCase().includes('bahaya') ||
+      String(dev.status).toLowerCase().includes('waspada')
+    );
+
+    if (isHazard && dev.lat && dev.lng) {
       const dist = getDistanceMeters(userLat, userLng, dev.lat, dev.lng);
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestFlood = { name: dev.name, distance: dist, water_level: level };
-        if (dist <= 100) isInside = true;
+      // Radius zona tiang sensor (default 90m)
+      const hazardRadius = 90;
+      if (dist <= hazardRadius) {
+        activeFloods.push({
+          name: dev.name || 'Titik Sensor',
+          water_level: level,
+          distance: dist,
+          type: 'sensor',
+          statusText: level >= 50 ? 'Bahaya (Siaga 1)' : 'Waspada'
+        });
       }
     }
   });
 
-  // Cek ke zona terdaftar
+  // 2. Periksa Zona Tersimpan (Zona 1 Tiang, Zona 2 Kontur Jalan, Zona 3 Hilir)
   (floodZones || []).forEach(zone => {
-    const checkSub = (sz) => {
-      if (sz.enabled !== false && sz.color !== '#22c55e') {
-        const center = sz.center || zone.center || [zone.lat, zone.lng];
+    // Ambil data level dari sensor terkait jika ada
+    const matchedDev = (deviceData || []).find(d => d.id === zone.id || d.id === zone.deviceId);
+    const devLevel = matchedDev ? (Number(matchedDev.water_level) || 0) : 0;
+    const effectiveLevel = isSimulationMode ? simulatedValue : devLevel;
+
+    const evaluateSubZone = (sz) => {
+      if (sz.enabled === false) return;
+
+      // Cek apakah zona ini berstatus banjir aktif:
+      // (Banjir jika level >= 30 cm, atau warna disetel merah/oranye/bahaya)
+      const isDangerousColor = sz.color === '#ef4444' || sz.color === '#f97316' || sz.color === '#ea580c';
+      const isWaterHigh = effectiveLevel >= 30;
+      if (!isDangerousColor && !isWaterHigh) {
+        // Zona aman / hijau -> pengguna masuk sini tidak dianggap bahaya
+        return;
+      }
+
+      const activeWaterDepth = effectiveLevel > 0 ? effectiveLevel : (isDangerousColor ? 60 : 35);
+
+      // A. Jika tipe kontur jalan (Zona 2) -> cek jarak ke segmen jalan
+      if (sz.type === 'road' && sz.road_points && sz.road_points.length >= 2) {
+        const roadWidth = Number(sz.road_width || 18);
+        const roadBuffer = roadWidth * 1.5; // buffer lebar jalan dalam meter
+        let minRoadDist = 999999;
+
+        for (let i = 0; i < sz.road_points.length - 1; i++) {
+          const ptA = sz.road_points[i];
+          const ptB = sz.road_points[i + 1];
+          const d = distToSegmentMeters(userLat, userLng, ptA[0], ptA[1], ptB[0], ptB[1]);
+          if (d < minRoadDist) minRoadDist = d;
+        }
+
+        if (minRoadDist <= roadBuffer) {
+          activeFloods.push({
+            name: `${zone.name || 'Jalan Raya'} - ${sz.name || 'Kontur Jalan'}`,
+            water_level: activeWaterDepth,
+            distance: Math.round(minRoadDist),
+            type: 'road',
+            statusText: activeWaterDepth >= 50 ? 'Banjir Parah (Macet/Lumpuh)' : 'Genangan Air'
+          });
+        }
+      }
+      // B. Jika tipe poligon (Zona 3 Hilir)
+      else if (sz.type === 'polygon' && sz.polygon_points && sz.polygon_points.length >= 3) {
+        if (isPointInPolygon(userLat, userLng, sz.polygon_points)) {
+          activeFloods.push({
+            name: `${zone.name || 'Wilayah'} - ${sz.name || 'Area Cekungan'}`,
+            water_level: activeWaterDepth,
+            distance: 0,
+            type: 'polygon',
+            statusText: 'Kawasan Tergenang'
+          });
+        }
+      }
+      // C. Jika tipe lingkaran (Zona 1 Tiang)
+      else {
+        const center = sz.center || zone.center || (zone.lat && zone.lng ? [zone.lat, zone.lng] : null);
         if (center) {
           const dist = getDistanceMeters(userLat, userLng, center[0], center[1]);
-          const radius = Number(sz.radius_meter || 100);
-          if (dist < minDistance) {
-            minDistance = dist;
-            nearestFlood = { name: `${zone.name || 'Titik'} (${sz.name})`, distance: dist };
-            if (dist <= radius) isInside = true;
+          const radius = Number(sz.radius_meter || 80);
+          if (dist <= radius) {
+            activeFloods.push({
+              name: `${zone.name || 'Area'} - ${sz.name || 'Radius Tiang'}`,
+              water_level: activeWaterDepth,
+              distance: dist,
+              type: 'circle',
+              statusText: activeWaterDepth >= 50 ? 'Bahaya Tinggi' : 'Waspada'
+            });
           }
         }
       }
     };
 
     if (zone.sub_zones && Array.isArray(zone.sub_zones)) {
-      zone.sub_zones.forEach(checkSub);
+      zone.sub_zones.forEach(evaluateSubZone);
     } else {
-      checkSub(zone);
+      evaluateSubZone(zone);
     }
   });
 
-  if (isInside) {
+  // HASIL GEOFENCING:
+  // Hanya 'danger' jika pengguna berada di DALAM kawasan banjir aktif
+  if (activeFloods.length > 0) {
+    const primaryHazard = activeFloods[0];
     return {
       status: 'danger',
-      message: `PERINGATAN: Posisi Anda berada di area potensi banjir dekat ${nearestFlood?.name}!`,
-      nearestFlood
+      isInsideFlood: true,
+      hazard: primaryHazard,
+      allHazards: activeFloods,
+      message: `PERINGATAN: Posisi Anda berada di dalam zona genangan air aktif (${primaryHazard.name})! Ketinggian air: ${primaryHazard.water_level} cm.`
     };
   }
 
-  if (minDistance <= 300) {
-    return {
-      status: 'warning',
-      message: `Waspada: Anda berada sekitar ${minDistance} meter dari area genangan air (${nearestFlood?.name}).`,
-      nearestFlood
-    };
-  }
-
+  // Pengguna di luar wilayah banjir -> SELALU AMAN & TENANG
   return {
     status: 'safe',
-    message: 'Lokasi Anda aman. Tidak ada genangan banjir di sekitar Anda saat ini.',
-    nearestFlood
+    isInsideFlood: false,
+    message: 'Lokasi Anda saat ini aman. Anda berada di luar area genangan banjir.'
   };
 };
 
-// ─── Komponen Layer Peta: Marker Pengguna & Jalur Rute ──────────────────────
+// ─── Komponen Banner: Emergency Geofence Alert (Pop-up HANYA Saat Masuk Banjir) ─
+export const GeofenceEmergencyAlert = ({
+  userSafety,
+  onDismiss,
+  onCenterMap
+}) => {
+  const [snoozed, setSnoozed] = useState(false);
+  const lastAlertZoneRef = useRef(null);
+
+  // Auto-play audio & trigger notifikasi saat user BARU SAJA masuk zona bahaya
+  useEffect(() => {
+    if (userSafety?.status === 'danger' && userSafety?.hazard) {
+      const zoneKey = `${userSafety.hazard.name}-${userSafety.hazard.water_level}`;
+      if (lastAlertZoneRef.current !== zoneKey) {
+        lastAlertZoneRef.current = zoneKey;
+        setSnoozed(false);
+        playEmergencyFloodChime();
+        sendBrowserFloodNotification(userSafety.hazard.name, userSafety.hazard.water_level);
+      }
+    } else {
+      lastAlertZoneRef.current = null;
+      setSnoozed(false);
+    }
+  }, [userSafety]);
+
+  // JIKA TIDAK ADA BAHAYA ATAU SEDANG DISNOOZE -> TIDAK TAMPILKAN APAPUN
+  if (!userSafety || userSafety.status !== 'danger' || !userSafety.hazard || snoozed) {
+    return null;
+  }
+
+  const hazard = userSafety.hazard;
+  const isHighDanger = (hazard.water_level || 0) >= 50;
+
+  return (
+    <div
+      className="geofence-emergency-banner"
+      style={{
+        position: 'fixed',
+        top: '68px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 10000,
+        width: 'calc(100% - 24px)',
+        maxWidth: '560px',
+        background: 'linear-gradient(135deg, rgba(220, 38, 38, 0.98), rgba(153, 27, 27, 0.98))',
+        color: '#ffffff',
+        borderRadius: '16px',
+        boxShadow: '0 12px 40px rgba(220, 38, 38, 0.5), 0 0 0 2px rgba(254, 226, 226, 0.3)',
+        border: '2px solid #fecaca',
+        padding: '14px 16px',
+        backdropFilter: 'blur(12px)',
+        animation: 'bounceInDown 0.35s ease-out',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        {/* Pulsing Hazard Icon */}
+        <div style={{
+          width: '42px',
+          height: '42px',
+          borderRadius: '12px',
+          background: 'rgba(255, 255, 255, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          border: '1px solid rgba(255, 255, 255, 0.4)',
+          animation: 'pulse 1.2s infinite'
+        }}>
+          <ShieldAlert size={26} color="#ffffff" />
+        </div>
+
+        {/* Content Body */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontWeight: 800,
+              fontSize: '0.88rem',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase'
+            }}>
+              <span>🚨 PERINGATAN DARURAT: MASUK ZONA BANJIR!</span>
+            </div>
+            <button
+              onClick={() => {
+                setSnoozed(true);
+                if (typeof onDismiss === 'function') onDismiss();
+              }}
+              title="Tutup Notifikasi"
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '24px',
+                height: '24px',
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <X size={15} />
+            </button>
+          </div>
+
+          <div style={{
+            fontSize: '0.84rem',
+            fontWeight: 700,
+            marginTop: '4px',
+            color: '#fef08a'
+          }}>
+            📍 {hazard.name} &bull; Ketinggian Air: {hazard.water_level} cm
+          </div>
+
+          <div style={{
+            fontSize: '0.74rem',
+            lineHeight: 1.35,
+            marginTop: '4px',
+            color: '#fee2e2'
+          }}>
+            {isHighDanger
+              ? '⛔ Bahaya Tinggi! Air jalan cukup dalam. Sepeda motor & mobil sedan berisiko mogok/hanyut. Harap segera putar balik atau cari jalan alternatif!'
+              : '⚠️ Hati-hati! Terdapat genangan air di ruas jalan ini. Kurangi kecepatan dan pantau batas tinggi knalpot kendaraan.'}
+          </div>
+
+          {/* Badges Coming Soon for Telegram & SMS as requested */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            marginTop: '8px',
+            flexWrap: 'wrap'
+          }}>
+            <span style={{
+              fontSize: '0.66rem',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              background: 'rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              color: '#ffffff',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span>💬 Notifikasi Telegram</span>
+              <span style={{ opacity: 0.8, fontSize: '0.62rem' }}>(Coming Soon)</span>
+            </span>
+
+            <span style={{
+              fontSize: '0.66rem',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              background: 'rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              color: '#ffffff',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span>📱 SMS Alert</span>
+              <span style={{ opacity: 0.8, fontSize: '0.62rem' }}>(Coming Soon)</span>
+            </span>
+
+            {onCenterMap && (
+              <button
+                onClick={onCenterMap}
+                style={{
+                  fontSize: '0.68rem',
+                  padding: '3px 10px',
+                  borderRadius: '6px',
+                  background: '#ffffff',
+                  border: 'none',
+                  color: '#991b1b',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  marginLeft: 'auto'
+                }}
+              >
+                Lihat di Peta
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Komponen Layer Peta: Floating Badge Ketinggian Air Seluruh Wilayah ──────
+// "user yang di luar wilaayah bisa lihat di bagian web kalau ketinggian air di wilayah ini segini dan wilayah lai segini gitu"
+export const FloodTrafficBadgeLayer = ({
+  deviceData = [],
+  floodZones = [],
+  isSimulationMode = false,
+  simulatedValue = 0,
+  onSelectDevice
+}) => {
+  const map = useMap();
+  const markersRef = useRef([]);
+
+  useEffect(() => {
+    // Bersihkan marker lama
+    markersRef.current.forEach(m => {
+      try { map.removeLayer(m); } catch (_) {}
+    });
+    markersRef.current = [];
+
+    // Kumpulkan titik-titik pantau yang valid
+    const items = [];
+
+    (deviceData || []).forEach(dev => {
+      if (!dev.lat || !dev.lng) return;
+      const level = isSimulationMode ? simulatedValue : (Number(dev.water_level) || 0);
+      const isOnline = dev.isOnline !== false;
+
+      // Status Traffic Style
+      let statusColor = '#22c55e'; // Hijau Aman (< 20 cm)
+      let statusBadge = 'Aman';
+      let dotEmoji = '🟢';
+
+      if (!isOnline && !isSimulationMode) {
+        statusColor = '#94a3b8';
+        statusBadge = 'Offline';
+        dotEmoji = '⚪';
+      } else if (level >= 50) {
+        statusColor = '#ef4444'; // Merah Bahaya (>= 50 cm)
+        statusBadge = 'Bahaya';
+        dotEmoji = '🔴';
+      } else if (level >= 20) {
+        statusColor = '#f59e0b'; // Oranye/Kuning Waspada (20-49 cm)
+        statusBadge = 'Waspada';
+        dotEmoji = '🟠';
+      }
+
+      items.push({
+        id: dev.id,
+        name: dev.name || 'Titik Pantau',
+        lat: Number(dev.lat),
+        lng: Number(dev.lng),
+        level,
+        statusColor,
+        statusBadge,
+        dotEmoji,
+        device: dev
+      });
+    });
+
+    // Render Badge Mengambang seperti label jalan Google Maps
+    items.forEach(item => {
+      const icon = L.divIcon({
+        className: 'flood-traffic-badge-marker',
+        html: `
+          <div style="
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(15, 23, 42, 0.92);
+            color: #ffffff;
+            border: 1.5px solid ${item.statusColor};
+            border-radius: 9999px;
+            padding: 3px 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.45);
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            backdrop-filter: blur(6px);
+            cursor: pointer;
+            transform: translate(-50%, -36px);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+          ">
+            <span style="
+              width: 8px;
+              height: 8px;
+              border-radius: 50%;
+              background: ${item.statusColor};
+              box-shadow: 0 0 6px ${item.statusColor};
+              flex-shrink: 0;
+            "></span>
+            <span style="max-width: 130px; overflow: hidden; text-overflow: ellipsis; color: #f1f5f9;">
+              ${item.name.replace(/^Jalan\s+|^Jl\.\s+/i, '')}
+            </span>
+            <span style="
+              background: ${item.statusColor}22;
+              color: ${item.statusColor};
+              padding: 1px 5px;
+              border-radius: 4px;
+              font-weight: 800;
+            ">
+              ${item.level} cm
+            </span>
+          </div>
+        `,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+      });
+
+      const marker = L.marker([item.lat, item.lng], { icon, zIndexOffset: 200 });
+      marker.on('click', () => {
+        if (typeof onSelectDevice === 'function') {
+          onSelectDevice(item.device);
+        }
+      });
+
+      marker.addTo(map);
+      markersRef.current.push(marker);
+    });
+
+    return () => {
+      markersRef.current.forEach(m => {
+        try { map.removeLayer(m); } catch (_) {}
+      });
+      markersRef.current = [];
+    };
+  }, [deviceData, isSimulationMode, simulatedValue, map, onSelectDevice]);
+
+  return null;
+};
+
+// ─── Komponen Layer Peta: Garis Rute OSRM ────────────────────────────────────
 export const UserLocationMapLayer = ({
   userLocation,
   activeRoute,
@@ -274,9 +778,7 @@ export const UserLocationMapLayer = ({
   const map = useMap();
   const routeLayersRef = useRef([]);
 
-  // Render garis rute jalan OSRM di peta
   useEffect(() => {
-    // Hapus rute lama
     routeLayersRef.current.forEach(l => {
       try { map.removeLayer(l); } catch (_) {}
     });
@@ -284,31 +786,28 @@ export const UserLocationMapLayer = ({
 
     if (activeRoute && activeRoute.coordinates && activeRoute.coordinates.length >= 2) {
       const isRouteSafe = routeSafety?.isSafe !== false;
-      const routeColor = isRouteSafe ? '#0284c7' : '#ef4444'; // Biru jika aman, Merah jika banjir
+      const routeColor = isRouteSafe ? '#0284c7' : '#ef4444';
 
-      // Garis luar (casing bayangan)
       const outerLine = L.polyline(activeRoute.coordinates, {
         color: isRouteSafe ? '#0369a1' : '#991b1b',
         weight: 8,
-        opacity: 0.8,
+        opacity: 0.85,
         lineCap: 'round',
         lineJoin: 'round'
       });
 
-      // Garis utama
       const innerLine = L.polyline(activeRoute.coordinates, {
         color: routeColor,
         weight: 5,
         opacity: 0.95,
         lineCap: 'round',
-        dashArray: isRouteSafe ? null : '8, 8' // Putus-putus jika berbahaya
+        dashArray: isRouteSafe ? null : '8, 8'
       });
 
       outerLine.addTo(map);
       innerLine.addTo(map);
       routeLayersRef.current.push(outerLine, innerLine);
 
-      // Fit bounds peta agar rute pas di layar
       try {
         const bounds = L.latLngBounds(activeRoute.coordinates);
         map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
@@ -326,46 +825,235 @@ export const UserLocationMapLayer = ({
   return null;
 };
 
-// ─── Komponen Tombol Floating: "Lokasi Saya" (GPS Button) ───────────────────
+// ─── Komponen Tombol Floating: GPS Google Maps Style dengan Live Tracking ────
 export const UserLocationFloatingButton = ({
   onLocateUser,
   isLocating,
+  isTrackingLive,
   userLocation
 }) => {
   return (
-    <button
-      onClick={onLocateUser}
-      title="Temukan Lokasi Saya Sekarang"
-      style={{
-        position: 'absolute',
-        bottom: '150px',
-        right: '16px',
-        zIndex: 998,
-        width: '44px',
-        height: '44px',
-        borderRadius: '50%',
-        background: userLocation ? '#0284c7' : 'rgba(15, 23, 42, 0.95)',
-        border: `2px solid ${userLocation ? '#38bdf8' : '#334155'}`,
-        color: '#ffffff',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-        backdropFilter: 'blur(8px)',
-        transition: 'all 0.2s ease',
-      }}
-    >
-      {isLocating ? (
-        <Loader2 size={20} className="animate-spin" color="#38bdf8" />
-      ) : (
-        <Crosshair size={20} color={userLocation ? '#ffffff' : '#38bdf8'} />
+    <div style={{
+      position: 'absolute',
+      bottom: '150px',
+      right: '16px',
+      zIndex: 998,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-end',
+      gap: '6px'
+    }}>
+      {/* Tooltip / Label status tracking */}
+      {isTrackingLive && (
+        <div style={{
+          background: 'rgba(2, 132, 199, 0.95)',
+          color: '#ffffff',
+          fontSize: '0.68rem',
+          fontWeight: 700,
+          padding: '2px 8px',
+          borderRadius: '9999px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          animation: 'fadeIn 0.2s'
+        }}>
+          <Radio size={11} className="animate-pulse" />
+          <span>GPS Aktif (Live)</span>
+        </div>
       )}
-    </button>
+
+      <button
+        onClick={onLocateUser}
+        title={isTrackingLive ? 'Pusatkan ke Posisi GPS Saya' : 'Aktifkan Deteksi Posisi GPS Saya'}
+        style={{
+          width: '46px',
+          height: '46px',
+          borderRadius: '50%',
+          background: userLocation ? '#0284c7' : 'rgba(15, 23, 42, 0.95)',
+          border: `2px solid ${userLocation ? '#38bdf8' : '#334155'}`,
+          color: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 4px 18px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(8px)',
+          transition: 'all 0.2s ease',
+        }}
+      >
+        {isLocating ? (
+          <Loader2 size={20} className="animate-spin" color="#38bdf8" />
+        ) : (
+          <Crosshair size={22} color={userLocation ? '#ffffff' : '#38bdf8'} />
+        )}
+      </button>
+    </div>
   );
 };
 
-// ─── Komponen Floating Card: Status Lokasi & Cek Rute Aman ───────────────────
+// ─── Komponen: Ringkasan Ketinggian Air Seluruh Wilayah (Untuk User di Luar Area) ───
+// "user yang di luar wilaayah bisa lihat di bagian web kalau ketinggian air di wilayah ini segini dan wilayah lai segini gitu"
+export const FloodOverviewDrawer = ({
+  deviceData = [],
+  isSimulationMode = false,
+  simulatedValue = 0,
+  userLocation = null,
+  onFlyToDevice
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (!deviceData || deviceData.length === 0) return null;
+
+  // Urutkan: area yang paling tinggi airnya tampil di atas
+  const sortedDevices = [...deviceData].sort((a, b) => {
+    const lvlA = isSimulationMode ? simulatedValue : (Number(a.water_level) || 0);
+    const lvlB = isSimulationMode ? simulatedValue : (Number(b.water_level) || 0);
+    return lvlB - lvlA;
+  });
+
+  return (
+    <div style={{
+      position: 'absolute',
+      bottom: '88px',
+      left: '14px',
+      zIndex: 998,
+      maxWidth: '320px',
+      fontFamily: 'inherit'
+    }}>
+      {!isOpen ? (
+        <button
+          onClick={() => setIsOpen(true)}
+          style={{
+            background: 'rgba(15, 23, 42, 0.94)',
+            color: '#f8fafc',
+            border: '1px solid #334155',
+            borderRadius: '9999px',
+            padding: '7px 14px',
+            fontSize: '0.76rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            backdropFilter: 'blur(8px)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <Waves size={15} color="#38bdf8" />
+          <span>Pantau Ketinggian Air ({deviceData.length} Wilayah)</span>
+          <ChevronUp size={14} color="#94a3b8" />
+        </button>
+      ) : (
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.97)',
+          border: '1px solid #334155',
+          borderRadius: '14px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(12px)',
+          overflow: 'hidden',
+          width: '290px',
+          animation: 'fadeIn 0.2s'
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '9px 12px',
+            background: 'rgba(30, 41, 59, 0.6)',
+            borderBottom: '1px solid #1e293b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 700, color: '#f8fafc' }}>
+              <Waves size={14} color="#38bdf8" />
+              <span>Status Ketinggian Air Wilayah</span>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '2px' }}
+            >
+              <ChevronDown size={16} />
+            </button>
+          </div>
+
+          {/* List Wilayah */}
+          <div style={{ maxHeight: '220px', overflowY: 'auto', padding: '6px' }}>
+            {sortedDevices.map(dev => {
+              const level = isSimulationMode ? simulatedValue : (Number(dev.water_level) || 0);
+              const isOnline = dev.isOnline !== false;
+
+              let color = '#22c55e';
+              let statusText = 'Aman';
+              if (!isOnline && !isSimulationMode) {
+                color = '#94a3b8';
+                statusText = 'OFF';
+              } else if (level >= 50) {
+                color = '#ef4444';
+                statusText = 'Bahaya';
+              } else if (level >= 20) {
+                color = '#f59e0b';
+                statusText = 'Waspada';
+              }
+
+              let distanceText = null;
+              if (userLocation && dev.lat && dev.lng) {
+                const distM = getDistanceMeters(userLocation.lat, userLocation.lng, dev.lat, dev.lng);
+                distanceText = distM > 1000 ? `${(distM / 1000).toFixed(1)} km` : `${distM} m`;
+              }
+
+              return (
+                <div
+                  key={dev.id}
+                  onClick={() => {
+                    if (onFlyToDevice && dev.lat && dev.lng) {
+                      onFlyToDevice(dev);
+                    }
+                  }}
+                  style={{
+                    padding: '7px 8px',
+                    borderRadius: '8px',
+                    margin: '3px 0',
+                    background: 'rgba(30, 41, 59, 0.4)',
+                    border: `1px solid ${color}33`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(30, 41, 59, 0.8)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(30, 41, 59, 0.4)'}
+                >
+                  <div style={{ flex: 1, minWidth: 0, paddingRight: '8px' }}>
+                    <div style={{ fontSize: '0.74rem', fontWeight: 600, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {dev.name}
+                    </div>
+                    {distanceText && (
+                      <div style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                        📍 {distanceText} dari Anda
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color }}>
+                      {level} cm
+                    </div>
+                    <div style={{ fontSize: '0.62rem', color, fontWeight: 600 }}>
+                      {statusText}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Komponen Floating Card: Status Deteksi Rute & Navigasi ─────────────────
 export const RouteFloodNavigationCard = ({
   userLocation,
   userSafety,
@@ -379,7 +1067,7 @@ export const RouteFloodNavigationCard = ({
 }) => {
   const [minimized, setMinimized] = useState(false);
 
-  // Jika tidak ada lokasi user dan tidak ada tujuan, tidak perlu render
+  // Jika tidak ada lokasi user dan tidak ada tujuan, sembunyikan card agar peta bersih
   if (!userLocation && !searchedDestination) return null;
 
   return (
@@ -388,7 +1076,7 @@ export const RouteFloodNavigationCard = ({
       top: '74px',
       left: '12px',
       right: '12px',
-      maxWidth: '430px',
+      maxWidth: '420px',
       margin: '0 auto',
       zIndex: 999,
       background: 'rgba(15, 23, 42, 0.95)',
@@ -419,7 +1107,7 @@ export const RouteFloodNavigationCard = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Route size={16} color={routeSafety && !routeSafety.isSafe ? '#ef4444' : '#38bdf8'} />
           <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>
-            {activeRoute ? 'Navigasi Rute Anti-Banjir' : 'Deteksi Lokasi & Cuaca'}
+            {activeRoute ? 'Navigasi Rute Anti-Banjir' : 'Deteksi Lokasi GPS'}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -443,7 +1131,7 @@ export const RouteFloodNavigationCard = ({
 
       {!minimized && (
         <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {/* 1. Status Lokasi Pengguna Saat Ini */}
+          {/* Status Lokasi Pengguna Saat Ini */}
           {userLocation ? (
             <div style={{
               display: 'flex',
@@ -454,40 +1142,27 @@ export const RouteFloodNavigationCard = ({
               background:
                 userSafety?.status === 'danger'
                   ? 'rgba(239, 68, 68, 0.15)'
-                  : userSafety?.status === 'warning'
-                  ? 'rgba(250, 204, 21, 0.15)'
                   : 'rgba(34, 197, 94, 0.12)',
               border: `1px solid ${
                 userSafety?.status === 'danger'
                   ? '#ef4444'
-                  : userSafety?.status === 'warning'
-                  ? '#ca8a04'
                   : '#16a34a'
               }`
             }}>
               {userSafety?.status === 'danger' ? (
                 <ShieldAlert size={18} color="#ef4444" style={{ flexShrink: 0, marginTop: '2px' }} />
-              ) : userSafety?.status === 'warning' ? (
-                <AlertTriangle size={18} color="#facc15" style={{ flexShrink: 0, marginTop: '2px' }} />
               ) : (
-                <CheckCircle2 size={18} color="#22c55e" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <ShieldCheck size={18} color="#22c55e" style={{ flexShrink: 0, marginTop: '2px' }} />
               )}
               <div style={{ flex: 1 }}>
                 <div style={{
                   fontWeight: 700,
                   fontSize: '0.78rem',
-                  color:
-                    userSafety?.status === 'danger'
-                      ? '#f87171'
-                      : userSafety?.status === 'warning'
-                      ? '#fde047'
-                      : '#4ade80'
+                  color: userSafety?.status === 'danger' ? '#f87171' : '#4ade80'
                 }}>
                   {userSafety?.status === 'danger'
-                    ? '⚠️ Anda Berada di Area Banjir!'
-                    : userSafety?.status === 'warning'
-                    ? 'Waspada Banjir Dekat Anda'
-                    : '🟢 Lokasi Anda Aman'}
+                    ? '⚠️ Posisi Anda Masuk Area Banjir!'
+                    : '🟢 Posisi Anda Aman (Di Luar Banjir)'}
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#cbd5e1', marginTop: '2px', lineHeight: 1.3 }}>
                   {userSafety?.message}
@@ -505,7 +1180,7 @@ export const RouteFloodNavigationCard = ({
               border: '1px solid #334155'
             }}>
               <span style={{ fontSize: '0.74rem', color: '#94a3b8' }}>
-                Lokasi Anda belum terdeteksi
+                Lokasi GPS belum diaktifkan
               </span>
               <button
                 onClick={onLocateUser}
@@ -528,7 +1203,7 @@ export const RouteFloodNavigationCard = ({
             </div>
           )}
 
-          {/* 2. Informasi Cek Rute ke Tujuan */}
+          {/* Informasi Cek Rute ke Tujuan */}
           {searchedDestination && (
             <div style={{ borderTop: '1px solid #1e293b', paddingTop: '10px' }}>
               <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '4px' }}>
@@ -538,10 +1213,8 @@ export const RouteFloodNavigationCard = ({
                 {searchedDestination.title}
               </div>
 
-              {/* Jika rute sudah dihitung */}
               {activeRoute ? (
                 <div style={{ marginTop: '8px' }}>
-                  {/* Status Keamanan Rute */}
                   <div style={{
                     padding: '8px 10px',
                     borderRadius: '8px',
@@ -574,19 +1247,17 @@ export const RouteFloodNavigationCard = ({
                             </li>
                           ))}
                         </ul>
-                        Disarankan berhati-hati atau cari jalur alternatif!
+                        Disarankan cari jalur alternatif!
                       </div>
                     )}
                   </div>
 
-                  {/* Ringkasan Jarak & Waktu Tempuh */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#cbd5e1' }}>
                     <span>Jarak: <strong>{activeRoute.distanceKm} km</strong></span>
-                    <span>Estimasi Waktu: <strong>~{activeRoute.durationMin} mnt</strong></span>
+                    <span>Waktu Tempuh: <strong>~{activeRoute.durationMin} mnt</strong></span>
                   </div>
                 </div>
               ) : (
-                /* Tombol Hitung Rute */
                 <button
                   onClick={onCalculateRoute}
                   disabled={isLoadingRoute || !userLocation}
@@ -615,7 +1286,7 @@ export const RouteFloodNavigationCard = ({
                   ) : (
                     <>
                       <Navigation size={14} />
-                      Cek Apakah Rute Ini Ada Banjir
+                      Cek Apakah Rute Ini Ada Banjir di Depan
                     </>
                   )}
                 </button>

@@ -10,6 +10,9 @@ import {
   UserLocationMapLayer,
   UserLocationFloatingButton,
   RouteFloodNavigationCard,
+  GeofenceEmergencyAlert,
+  FloodTrafficBadgeLayer,
+  FloodOverviewDrawer,
   createUserLocationIcon,
   fetchOsrmRoute,
   checkRouteFloodSafety,
@@ -1191,34 +1194,82 @@ const App = () => {
   const [activeDrawPoints, setActiveDrawPoints] = useState([]);
   const { zones: floodZones, loadingZones, saveZone, deleteZone } = useFloodZones();
 
-  // ─── State Deteksi Lokasi Pengguna & Cek Rute Aman Banjir ────────────────
+  // ─── State Deteksi Lokasi Pengguna & Cek Rute Aman Banjir (Google Maps Style) ──
   const [userLocation, setUserLocation] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [isTrackingLive, setIsTrackingLive] = useState(false);
+  const watchIdRef = useRef(null);
   const [activeRoute, setActiveRoute] = useState(null);
   const [routeSafety, setRouteSafety] = useState(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
-  const userLocationIcon = useMemo(() => createUserLocationIcon(), []);
+  const userLocationIcon = useMemo(() => createUserLocationIcon(userLocation?.heading), [userLocation?.heading]);
 
   // Evaluasi otomatis keamanan lokasi pengguna saat ini terhadap banjir
+  // PERATURAN: Hanya return 'danger' jika pengguna berada di DALAM kawasan banjir aktif
   const userSafety = useMemo(() => {
     if (!userLocation) return { status: 'unknown' };
-    return checkUserLocationSafety(userLocation.lat, userLocation.lng, floodZones, data);
-  }, [userLocation, floodZones, data]);
+    return checkUserLocationSafety(
+      userLocation.lat,
+      userLocation.lng,
+      floodZones,
+      data,
+      isSimulationMode,
+      simulatedValue
+    );
+  }, [userLocation, floodZones, data, isSimulationMode, simulatedValue]);
 
-  // Handler temukan posisi GPS pengguna
+  // Bersihkan GPS watchPosition saat unmount
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
+
+  // Handler temukan & pantau posisi GPS pengguna secara Live (Continuous Watch)
   const handleLocateUser = () => {
     if (!navigator.geolocation) {
       alert('Browser Anda tidak mendukung deteksi lokasi (Geolocation).');
       return;
     }
+
+    // Jika sudah ada lokasi dan sedang tracking, langsung pusatkan peta
+    if (userLocation) {
+      setMainMapTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 16, _ts: Date.now() });
+    }
+
     setIsLocating(true);
+
+    // Ambil posisi awal segera
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setIsLocating(false);
-        const { latitude, longitude, accuracy } = pos.coords;
-        const loc = { lat: latitude, lng: longitude, accuracy };
+        const { latitude, longitude, accuracy, heading, speed } = pos.coords;
+        const loc = { lat: latitude, lng: longitude, accuracy, heading, speed };
         setUserLocation(loc);
         setMainMapTarget({ lat: latitude, lng: longitude, zoom: 16, _ts: Date.now() });
+
+        // Mulai pelacakan terus menerus (live tracking saat berjalan / berkendara)
+        if (watchIdRef.current !== null) {
+          navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (watchPos) => {
+            const wCoords = watchPos.coords;
+            setUserLocation({
+              lat: wCoords.latitude,
+              lng: wCoords.longitude,
+              accuracy: wCoords.accuracy,
+              heading: wCoords.heading,
+              speed: wCoords.speed
+            });
+            setIsTrackingLive(true);
+          },
+          (err) => console.warn('WatchPosition warn:', err),
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+        );
+        setIsTrackingLive(true);
       },
       (err) => {
         setIsLocating(false);
@@ -1228,7 +1279,7 @@ const App = () => {
         else if (err.code === 3) msg = 'Waktu deteksi lokasi habis (timeout).';
         alert(msg);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
     );
   };
 
@@ -1238,7 +1289,7 @@ const App = () => {
     try {
       const routeData = await fetchOsrmRoute(startLoc.lat, startLoc.lng, dest.lat, dest.lng);
       setActiveRoute(routeData);
-      const safety = checkRouteFloodSafety(routeData.coordinates, floodZones, data);
+      const safety = checkRouteFloodSafety(routeData.coordinates, floodZones, data, isSimulationMode, simulatedValue);
       setRouteSafety(safety);
     } catch (e) {
       alert('Gagal menganalisis rute jalan: ' + (e?.message || 'Error'));
@@ -3842,7 +3893,22 @@ const App = () => {
               onAddPoint={(pt) => setActiveDrawPoints(prev => [...(prev || []), pt])}
             />
 
-            {/* ─── Flood Zone Overlay (Simulasi Zona Genangan) ─────────────────── */}
+            {/* ─── Badge Ketinggian Air Mengambang di Peta (Google Maps Traffic Style) ── */}
+            {/* Memungkinkan pengguna di luar area melihat tinggi air tiap wilayah secara langsung */}
+            <FloodTrafficBadgeLayer
+              deviceData={data}
+              floodZones={floodZones}
+              isSimulationMode={isSimulationMode}
+              simulatedValue={simulatedValue}
+              onSelectDevice={(device) => {
+                setSelectedDevice(device);
+                setView('device-detail');
+                setIsNavSidebarOpen(true);
+                setMainMapTarget({ lat: device.lat, lng: device.lng, zoom: 16, _ts: Date.now() });
+              }}
+            />
+
+            {/* ─── Flood Zone Overlay (Simulasi & Kontur Jalan Traffic Banjir) ─── */}
             {/* Layer ini HANYA visual. Tidak ada data IoT yang diubah. */}
             {showFloodZones && !loadingZones && (
               <FloodZoneLayer
@@ -3856,10 +3922,35 @@ const App = () => {
                   color: '#facc15',
                   name: 'Sedang Ditandai di Peta'
                 } : null}
+                deviceData={data}
               />
             )}
           </MapContainer>
         </div>
+      )}
+
+      {/* ─── Banner Notifikasi Darurat Geofence (HANYA Muncul Saat Pengguna Masuk Kawasan Banjir Aktif) ─── */}
+      <GeofenceEmergencyAlert
+        userSafety={userSafety}
+        onCenterMap={() => {
+          if (userLocation) {
+            setMainMapTarget({ lat: userLocation.lat, lng: userLocation.lng, zoom: 16, _ts: Date.now() });
+          }
+        }}
+      />
+
+      {/* ─── Ringkasan Ketinggian Air Seluruh Wilayah (Untuk Pengguna di Luar Area) ─── */}
+      {(view === 'dashboard' || view === 'device-detail') && (
+        <FloodOverviewDrawer
+          deviceData={data}
+          isSimulationMode={isSimulationMode}
+          simulatedValue={simulatedValue}
+          userLocation={userLocation}
+          onFlyToDevice={(dev) => {
+            setMainMapTarget({ lat: dev.lat, lng: dev.lng, zoom: 16, _ts: Date.now() });
+            setSelectedDevice(dev);
+          }}
+        />
       )}
 
       {/* ─── Panel Kontrol Simulasi (Floating, hanya di dashboard/device-detail) */}
@@ -3874,11 +3965,12 @@ const App = () => {
         />
       )}
 
-      {/* ─── Tombol Floating: Lokasi Saya (GPS Locator) ─────────────────── */}
+      {/* ─── Tombol Floating: Lokasi Saya (GPS Locator dengan Live Continuous Tracking) ─── */}
       {(view === 'dashboard' || view === 'device-detail') && (
         <UserLocationFloatingButton
           onLocateUser={handleLocateUser}
           isLocating={isLocating}
+          isTrackingLive={isTrackingLive}
           userLocation={userLocation}
         />
       )}

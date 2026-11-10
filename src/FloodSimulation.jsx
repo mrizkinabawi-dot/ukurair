@@ -49,7 +49,8 @@ export const FloodZoneLayer = ({
   zones,
   simulatedValue,
   isSimulationMode,
-  drawingZone
+  drawingZone,
+  deviceData = []
 }) => {
   const map = useMap();
   const layersRef = useRef([]);
@@ -62,53 +63,98 @@ export const FloodZoneLayer = ({
     layersRef.current = [];
 
     // Helper untuk render satu zona objek
-    const renderSingleZone = (z, isPreview = false) => {
+    const renderSingleZone = (z, isPreview = false, parentRecord = null) => {
       if (z.enabled === false && !isPreview) return; // Jangan render jika dinonaktifkan / dihapus
 
-      const zoneColor = z.color || '#38bdf8';
+      // ─── Tentukan Ketinggian Air Efektif & Warna Traffic ala Google Maps ───
+      let effectiveLevel = 0;
+      if (isSimulationMode) {
+        effectiveLevel = Number(simulatedValue) || 0;
+      } else {
+        const targetId = z.deviceId || parentRecord?.deviceId || parentRecord?.id || z.id;
+        const matched = (deviceData || []).find(d => d.id === targetId);
+        effectiveLevel = matched ? (Number(matched.water_level) || 0) : 0;
+      }
+
+      // Dynamic Traffic Flood Styling:
+      // - Hijau: < 20 cm (Aman, jalan kering & lancar)
+      // - Kuning / Oranye: 20 - 49 cm (Waspada genangan sedang)
+      // - Merah: >= 50 cm (Bahaya! Jalan terendam banjir, macet total)
+      let trafficColor = '#22c55e';
+      let trafficBorder = '#15803d';
+      let trafficLabel = 'Aman & Kering (Jalan Lancar)';
+      let isHazard = false;
+
+      if (effectiveLevel >= 50) {
+        trafficColor = '#ef4444';
+        trafficBorder = '#991b1b';
+        trafficLabel = 'BAHAYA BANJIR (Jalan Terendam)';
+        isHazard = true;
+      } else if (effectiveLevel >= 20) {
+        trafficColor = '#f59e0b';
+        trafficBorder = '#b45309';
+        trafficLabel = 'Waspada Genangan Air';
+        isHazard = true;
+      }
+
+      // Bila admin menyetel warna khusus (useCustomColor), hormati preferensi admin
+      const zoneColor = (z.useCustomColor && z.color) ? z.color : trafficColor;
       const zoneType = z.type || 'circle';
 
-      let opacity = isSimulationMode && simulatedValue > 60 ? 0.6 : 0.35;
-      if (isPreview) opacity = 0.5;
+      let opacity = isSimulationMode && simulatedValue > 60 ? 0.6 : 0.4;
+      if (isPreview) opacity = 0.55;
 
-      // 1. Tipe Jalur Kontur Jalan (Polyline dengan lebar jalan)
+      // 1. Tipe Jalur Kontur Jalan (Polyline Traffic ala Google Maps)
       if (zoneType === 'road' && z.road_points && z.road_points.length >= 2) {
         const roadWidth = Number(z.road_width) || 16;
-        
-        // Garis batas luar (casing)
+        const isRedHazard = zoneColor === '#ef4444';
+        const isYellow = zoneColor === '#f59e0b';
+
+        // Garis batas luar (casing jalan tegas)
         const outerPoly = L.polyline(z.road_points, {
-          color: zoneColor,
-          weight: roadWidth + 4,
-          opacity: 0.9,
+          color: isRedHazard ? '#b91c1c' : (isYellow ? '#b45309' : '#15803d'),
+          weight: roadWidth + (isRedHazard ? 6 : 4),
+          opacity: 0.95,
           lineCap: 'round',
           lineJoin: 'round',
         });
 
-        // Garis dalam / isi jalan
+        // Garis dalam / isi jalur lalu lintas (Google Maps Traffic style)
         const innerPoly = L.polyline(z.road_points, {
-          color: '#ffffff',
-          weight: Math.max(2, Math.floor(roadWidth / 4)),
-          opacity: 0.8,
-          dashArray: '8, 8',
+          color: zoneColor,
+          weight: Math.max(3, Math.floor(roadWidth / 2.5)),
+          opacity: 1,
+          dashArray: isRedHazard ? '6, 6' : null,
           lineCap: 'round',
         });
 
         const popupContent = `
-          <div style="min-width: 180px; font-family: inherit; color: #f1f5f9; padding: 2px;">
-            <div style="font-size: 0.7rem; font-weight: 700; color: ${zoneColor}; text-transform: uppercase;">
-              🛣️ ${z.name || 'Kontur Jalan'}
+          <div style="min-width: 190px; font-family: inherit; color: #f1f5f9; padding: 2px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+              <span style="font-size: 0.72rem; font-weight: 800; color: ${zoneColor}; text-transform: uppercase;">
+                🛣️ ${z.name || 'Kontur Jalan'}
+              </span>
+              <span style="
+                background: ${zoneColor}22;
+                color: ${zoneColor};
+                border: 1px solid ${zoneColor};
+                padding: 1px 6px;
+                border-radius: 9999px;
+                font-size: 0.65rem;
+                font-weight: 700;
+              ">
+                ${effectiveLevel} cm
+              </span>
             </div>
-            <div style="font-size: 0.78rem; font-weight: bold; margin: 3px 0;">
-              Tipe: Mengikuti Kontur Jalan (${z.road_points.length} Titik)
+            <div style="font-size: 0.76rem; font-weight: bold; color: ${zoneColor}; margin-bottom: 3px;">
+              Kondisi: ${trafficLabel}
             </div>
-            <div style="font-size: 0.72rem; color: #cbd5e1; margin-bottom: 4px;">
+            <div style="font-size: 0.72rem; color: #cbd5e1; margin-bottom: 5px;">
               ${z.notes || 'Menyesuaikan kontur jalan raya'}
             </div>
-            ${isSimulationMode ? `
-              <div style="background: rgba(56,189,248,0.15); border: 1px solid #0284c7; border-radius: 4px; padding: 3px 6px; font-size: 0.7rem; color: #38bdf8;">
-                Simulasi Air: <strong>${simulatedValue} cm</strong>
-              </div>
-            ` : ''}
+            <div style="font-size: 0.68rem; color: #94a3b8; border-top: 1px solid #334155; padding-top: 3px;">
+              ${z.road_points.length} Titik Jalur &bull; Lebar: ${roadWidth}px
+            </div>
           </div>
         `;
 
@@ -117,7 +163,7 @@ export const FloodZoneLayer = ({
         innerPoly.addTo(map);
         layersRef.current.push(outerPoly, innerPoly);
 
-        // Marker kecil pada titik-titik jalan jika sedang preview
+        // Marker kecil pada titik-titik jalan jika sedang preview/edit
         if (isPreview) {
           z.road_points.forEach((pt) => {
             const dot = L.circleMarker(pt, {
@@ -132,7 +178,7 @@ export const FloodZoneLayer = ({
           });
         }
       } 
-      // 2. Tipe Area Poligon Bebas
+      // 2. Tipe Area Poligon Bebas (Zona 3 Hilir)
       else if (zoneType === 'polygon' && z.polygon_points && z.polygon_points.length >= 3) {
         const poly = L.polygon(z.polygon_points, {
           color: zoneColor,
@@ -144,10 +190,15 @@ export const FloodZoneLayer = ({
 
         const popupContent = `
           <div style="min-width: 180px; font-family: inherit; color: #f1f5f9; padding: 2px;">
-            <div style="font-size: 0.7rem; font-weight: 700; color: ${zoneColor}; text-transform: uppercase;">
-              📐 ${z.name || 'Kontur Area'}
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+              <span style="font-size: 0.7rem; font-weight: 700; color: ${zoneColor}; text-transform: uppercase;">
+                📐 ${z.name || 'Kontur Area'}
+              </span>
+              <span style="color: ${zoneColor}; font-weight: 800; font-size: 0.75rem;">
+                ${effectiveLevel} cm
+              </span>
             </div>
-            <div style="font-size: 0.75rem; color: #cbd5e1; margin-top: 2px;">
+            <div style="font-size: 0.75rem; color: #cbd5e1;">
               ${z.notes || 'Area kontur tanah / pemukiman'}
             </div>
           </div>
@@ -156,7 +207,7 @@ export const FloodZoneLayer = ({
         poly.addTo(map);
         layersRef.current.push(poly);
       } 
-      // 3. Tipe Lingkaran Radius (Zona Normal Tiang Sensor)
+      // 3. Tipe Lingkaran Radius (Zona 1 Normal Tiang Sensor)
       else if (zoneType === 'circle') {
         const center = z.center || (z.lat && z.lng ? [z.lat, z.lng] : null);
         if (!center) return;
@@ -167,17 +218,22 @@ export const FloodZoneLayer = ({
           color: zoneColor,
           fillColor: zoneColor,
           fillOpacity: opacity,
-          weight: 2,
+          weight: 2.5,
           dashArray: isPreview ? '4, 4' : null,
         });
 
         const popupContent = `
           <div style="min-width: 180px; font-family: inherit; color: #f1f5f9; padding: 2px;">
-            <div style="font-size: 0.7rem; font-weight: 700; color: ${zoneColor}; text-transform: uppercase;">
-              ⭕ ${z.name || 'Zona 1 (Dekat Tiang)'}
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+              <span style="font-size: 0.7rem; font-weight: 700; color: ${zoneColor}; text-transform: uppercase;">
+                ⭕ ${z.name || 'Zona 1 (Dekat Tiang)'}
+              </span>
+              <span style="color: ${zoneColor}; font-weight: 800; font-size: 0.75rem;">
+                ${effectiveLevel} cm
+              </span>
             </div>
             <div style="font-size: 0.78rem; font-weight: bold; margin: 2px 0;">
-              Radius: ${radius} Meter
+              Radius: ${radius} Meter &bull; ${trafficLabel}
             </div>
             <div style="font-size: 0.72rem; color: #cbd5e1;">
               ${z.notes || 'Lokasi normal mengikuti tinggi tiang'}
@@ -192,18 +248,18 @@ export const FloodZoneLayer = ({
 
     // Render semua zona tersimpan
     zones.forEach(zoneRecord => {
-      // Jika memiliki sub-zona (Zona 1, Zona 2, Zona 3)
       if (zoneRecord.sub_zones && Array.isArray(zoneRecord.sub_zones)) {
         zoneRecord.sub_zones.forEach(sz => {
           if (sz && sz.enabled !== false) {
             renderSingleZone({
               ...sz,
-              center: sz.center || zoneRecord.center || [zoneRecord.lat, zoneRecord.lng]
-            });
+              center: sz.center || zoneRecord.center || [zoneRecord.lat, zoneRecord.lng],
+              deviceId: zoneRecord.deviceId || zoneRecord.id
+            }, false, zoneRecord);
           }
         });
       } else if (zoneRecord.enabled !== false) {
-        renderSingleZone(zoneRecord);
+        renderSingleZone(zoneRecord, false, zoneRecord);
       }
     });
 
@@ -218,7 +274,7 @@ export const FloodZoneLayer = ({
       });
       layersRef.current = [];
     };
-  }, [zones, simulatedValue, isSimulationMode, drawingZone, map]);
+  }, [zones, simulatedValue, isSimulationMode, drawingZone, deviceData, map]);
 
   return null;
 };

@@ -287,6 +287,7 @@ export const SimulationControlPanel = ({
   setSimulatedValue,
   showZones,
   setShowZones,
+  onOpenEditRange
 }) => {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -394,6 +395,32 @@ export const SimulationControlPanel = ({
             </div>
           )}
 
+          {onOpenEditRange && (
+            <button
+              type="button"
+              onClick={onOpenEditRange}
+              style={{
+                width: '100%',
+                marginTop: '8px',
+                padding: '6px 10px',
+                borderRadius: '8px',
+                background: 'rgba(56, 189, 248, 0.15)',
+                border: '1px solid #0284c7',
+                color: '#38bdf8',
+                fontWeight: 700,
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Sliders size={13} /> Sesuaikan Range & Jarak Titik Ini
+            </button>
+          )}
+
           <div style={{ marginTop: '8px', fontSize: '0.68rem', color: '#64748b', textAlign: 'center' }}>
             💡 Klik titik sensor di peta & pilih <strong>Atur Range</strong> untuk sesuaikan kontur jalan.
           </div>
@@ -413,7 +440,8 @@ export const EditRangeModal = ({
   isDrawingRoad,
   setIsDrawingRoad,
   activeDrawPoints,
-  setActiveDrawPoints
+  setActiveDrawPoints,
+  isAdminUser = true
 }) => {
   // Pilihan tab zona: 0 = Zona 1 (Tiang), 1 = Zona 2 (Jalan), 2 = Zona 3 (Area/Cekungan)
   const [activeTab, setActiveTab] = useState(0);
@@ -575,9 +603,16 @@ export const EditRangeModal = ({
         updated_at: Date.now()
       };
 
-      await onSaveZone(payload);
+      if (typeof onSaveZone === 'function') {
+        await onSaveZone(payload);
+      }
       setIsDrawingRoad(false);
       onClose();
+      if (isAdminUser) {
+        alert('✅ Konfigurasi range & kontur jalan berhasil disimpan permanen ke server database!');
+      } else {
+        alert('✅ Range berhasil diterapkan pada peta (Mode Demo/Tamu). Silakan login Admin jika ingin menyimpan permanen ke server.');
+      }
     } catch (err) {
       alert('Gagal menyimpan zona: ' + err.message);
     } finally {
@@ -905,10 +940,32 @@ export const EditRangeModal = ({
                 </div>
               </div>
 
-              {/* Slider Lebar Jalan */}
-              <div style={{ marginTop: '8px' }}>
+              {/* Slider Jangkauan Jarak Luapan Air dari Jalan (Meter) */}
+              <div style={{ marginTop: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#cbd5e1', marginBottom: '3px' }}>
+                  <span style={{ fontWeight: 600 }}>Jangkauan Jarak Luapan Air (Buffer Radius):</span>
+                  <strong style={{ color: '#38bdf8' }}>{currentSubZone.radius_meter || 35} Meter</strong>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="200"
+                  step="5"
+                  value={currentSubZone.radius_meter || 35}
+                  onChange={(e) => updateCurrentSubZone({ radius_meter: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: currentSubZone.color, cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: '#64748b' }}>
+                  <span>10 m (Dekat Jalur)</span>
+                  <span>100 m (Sedang)</span>
+                  <span>200 m (Luas)</span>
+                </div>
+              </div>
+
+              {/* Slider Lebar / Ketebalan Garis Jalan */}
+              <div style={{ marginTop: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: '#cbd5e1', marginBottom: '2px' }}>
-                  <span>Ketebalan / Lebar Jalan:</span>
+                  <span>Ketebalan / Lebar Garis Jalan:</span>
                   <strong style={{ color: '#38bdf8' }}>{currentSubZone.road_width || 18} px</strong>
                 </div>
                 <input
@@ -919,6 +976,11 @@ export const EditRangeModal = ({
                   onChange={(e) => updateCurrentSubZone({ road_width: Number(e.target.value) })}
                   style={{ width: '100%', accentColor: currentSubZone.color, cursor: 'pointer' }}
                 />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.62rem', color: '#64748b' }}>
+                  <span>8 px (Tipis)</span>
+                  <span>20 px (Standar)</span>
+                  <span>40 px (Tebal)</span>
+                </div>
               </div>
             </div>
           )}
@@ -927,7 +989,7 @@ export const EditRangeModal = ({
           {activeTab !== 1 && (
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#cbd5e1' }}>Jangkauan Radius (Meter)</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#cbd5e1' }}>Jangkauan Radius (Meter):</span>
                 <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#38bdf8' }}>{currentSubZone.radius_meter || 80} Meter</span>
               </div>
               <input

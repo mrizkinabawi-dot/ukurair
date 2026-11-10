@@ -1574,7 +1574,7 @@ td {
 .flood-traffic-badge-marker {
   background: transparent !important;
   border: none !important;
-  pointer-events: auto !important;
+  pointer-events: none !important;
 }
 
 .flood-traffic-badge-marker:hover div {

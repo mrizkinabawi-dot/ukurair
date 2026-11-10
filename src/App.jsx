@@ -3856,30 +3856,28 @@ const App = () => {
                         >
                           <Navigation size={13} /> Cek Rute
                         </button>
-                        {isAdminUser && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingRangeDevice(device);
-                            }}
-                            title="Atur range jangkauan, warna & kondisi tanah untuk titik ini"
-                            style={{
-                              background: 'rgba(56, 189, 248, 0.15)',
-                              color: '#38bdf8',
-                              border: '1px solid #0284c7',
-                              borderRadius: '6px',
-                              padding: '4px 10px',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <Sliders size={13} /> Atur Range
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingRangeDevice(device);
+                          }}
+                          title="Atur range jangkauan jarak, warna & kontur jalan untuk titik ini"
+                          style={{
+                            background: 'rgba(56, 189, 248, 0.2)',
+                            color: '#38bdf8',
+                            border: '1px solid #0284c7',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <Sliders size={13} /> Atur Range
+                        </button>
                       </div>
                     </div>
                   </Popup>
@@ -3962,6 +3960,7 @@ const App = () => {
           setSimulatedValue={setSimulatedValue}
           showZones={showFloodZones}
           setShowZones={setShowFloodZones}
+          onOpenEditRange={() => setEditingRangeDevice(selectedDevice || data[0])}
         />
       )}
 
@@ -3990,8 +3989,8 @@ const App = () => {
         />
       )}
 
-      {/* ─── Modal Sederhana: Edit Range & Warna Titik Pantau Langsung (Admin) ─── */}
-      {editingRangeDevice && isAdminUser && (
+      {/* ─── Modal: Edit Range Jarak & Kontur Jalan ─── */}
+      {editingRangeDevice && (
         <EditRangeModal
           device={editingRangeDevice}
           currentZone={floodZones.find(z => z.device_id === editingRangeDevice.id || z.id === `zone-${editingRangeDevice.id}`)}
@@ -4005,6 +4004,7 @@ const App = () => {
           setIsDrawingRoad={setIsDrawingRoad}
           activeDrawPoints={activeDrawPoints}
           setActiveDrawPoints={setActiveDrawPoints}
+          isAdminUser={isAdminUser}
         />
       )}
 
@@ -4675,6 +4675,28 @@ const App = () => {
                       title="Buka Grafik Detail Layar Penuh Seperti Admin"
                     >
                       <BarChart3 size={14} /> Lihat Grafik Detail
+                    </button>
+                    <button
+                      onClick={() => setEditingRangeDevice(selectedDevice)}
+                      style={{
+                        background: 'rgba(56, 189, 248, 0.2)',
+                        border: '1px solid #0284c7',
+                        color: '#38bdf8',
+                        borderRadius: '20px',
+                        padding: '4px 12px',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        fontWeight: 700,
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={e => { e.currentTarget.style.background = '#0284c7'; e.currentTarget.style.color = '#ffffff'; }}
+                      onMouseOut={e => { e.currentTarget.style.background = 'rgba(56, 189, 248, 0.2)'; e.currentTarget.style.color = '#38bdf8'; }}
+                      title="Sesuaikan Jarak Range & Kontur Jalan untuk titik ini"
+                    >
+                      <Sliders size={14} /> Atur Range & Jarak
                     </button>
                   </div>
                   {/* Informasi Jaringan Teknis (IP & MAC) khusus untuk ADMIN */}

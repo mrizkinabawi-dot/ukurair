@@ -22,11 +22,12 @@ import {
   ManualWaterLevelModal,
   DeviceDetailManualControlWidget
 } from './ManualWaterLevelModal';
+import { QrCodeDemoModal } from './QrCodeDemoModal';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine
 } from 'recharts';
 import {
-  Activity, Database, AlertTriangle, Shield, Settings, LogOut, ChevronRight, BarChart3, Map, LayoutDashboard, Radio, RefreshCcw, ArrowLeft, ArrowRight, Home, Menu, Search, X, Bookmark, Clock, LogIn, User, MinusCircle, Download, Wifi, Cpu, Battery, BatteryCharging, Sun, CloudRain, Sparkles, Bot, Bell, Send, Smartphone, MessageSquare, Check, Share2, Mail, Camera, MapPin, Navigation, Maximize2, Minimize2, Eye, EyeOff, Copy, Edit3, Save, ExternalLink, Sliders
+  Activity, Database, AlertTriangle, Shield, Settings, LogOut, ChevronRight, BarChart3, Map, LayoutDashboard, Radio, RefreshCcw, ArrowLeft, ArrowRight, Home, Menu, Search, X, Bookmark, Clock, LogIn, User, MinusCircle, Download, Wifi, Cpu, Battery, BatteryCharging, Sun, CloudRain, Sparkles, Bot, Bell, Send, Smartphone, MessageSquare, Check, Share2, Mail, Camera, MapPin, Navigation, Maximize2, Minimize2, Eye, EyeOff, Copy, Edit3, Save, ExternalLink, Sliders, QrCode
 } from 'lucide-react';
 import { auth, db } from './firebase';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
@@ -888,6 +889,7 @@ const ProfileChromePopup = ({
   onClose,
   onManageAdmin,
   onOpenNotif,
+  onOpenQr,
   onSwitchAccount,
   onLogout,
   onLogin
@@ -1080,6 +1082,26 @@ const ProfileChromePopup = ({
             </div>
 
             <div
+              onClick={onOpenQr}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                color: '#e2e8f0',
+                fontSize: '0.88rem',
+                transition: 'background 0.15s'
+              }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <QrCode size={18} color="#facc15" />
+              <span>Kode QR Demo (Buka di HP)</span>
+            </div>
+
+            <div
               onClick={onSwitchAccount}
               style={{
                 display: 'flex',
@@ -1122,23 +1144,45 @@ const ProfileChromePopup = ({
             </div>
           </>
         ) : (
-          <button
-            onClick={onLogin}
-            style={{
-              width: '100%',
-              padding: '10px',
-              background: '#38bdf8',
-              color: '#0f172a',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 700,
-              fontSize: '0.9rem',
-              cursor: 'pointer',
-              marginTop: '6px'
-            }}
-          >
-            Login Sekarang
-          </button>
+          <>
+            <div
+              onClick={onOpenQr}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                color: '#e2e8f0',
+                fontSize: '0.88rem',
+                marginBottom: '6px',
+                transition: 'background 0.15s'
+              }}
+              onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+              onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <QrCode size={18} color="#facc15" />
+              <span>Kode QR Demo (Buka di HP)</span>
+            </div>
+            <button
+              onClick={onLogin}
+              style={{
+                width: '100%',
+                padding: '10px',
+                background: '#38bdf8',
+                color: '#0f172a',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                marginTop: '6px'
+              }}
+            >
+              Login Sekarang
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -2051,6 +2095,23 @@ const App = () => {
   const [notifSavedFeedback, setNotifSavedFeedback] = useState(false);
   const [notifTestFeedback, setNotifTestFeedback] = useState('');
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+
+  // Auto-focus ke titik sensor tertentu jika membuka link via Scan QR Code (?device=<id>)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const targetId = params.get('device') || params.get('alat') || params.get('id');
+      if (targetId && data.length > 0) {
+        const found = data.find(d => d.id === targetId || String(d.id).toLowerCase() === targetId.toLowerCase());
+        if (found) {
+          setSelectedDevice(found);
+          setMainMapTarget({ lat: found.lat, lng: found.lng, zoom: 16, _ts: Date.now() });
+          setIsNavSidebarOpen(true);
+        }
+      }
+    } catch (e) {}
+  }, [data]);
 
   // Smooth continuous interpolated data for Detail Modal Chart (disesuaikan untuk sensor 10 menit)
   const detailChartData = useMemo(() => {
@@ -4508,6 +4569,14 @@ const App = () => {
           <button onClick={() => { setView('dashboard'); setSelectedDevice(null); }} className="btn btn-header-nav">
             Peta Utama
           </button>
+          <button
+            onClick={() => setShowQrModal(true)}
+            className="btn btn-header-nav"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+            title="Scan QR Code untuk demonstrasi di HP Dosen / Penguji"
+          >
+            <QrCode size={14} color="#38bdf8" /> QR Code Demo
+          </button>
           {user ? (
             isAdminUser ? (
               <button onClick={() => setView('admin')} className={`btn btn-header-nav ${view === 'admin' ? 'active-nav' : ''}`}>
@@ -4552,6 +4621,7 @@ const App = () => {
               onClose={() => setIsHeaderProfileOpen(false)}
               onManageAdmin={() => { setView('admin'); setIsHeaderProfileOpen(false); }}
               onOpenNotif={() => { setShowNotificationModal(true); setIsHeaderProfileOpen(false); }}
+              onOpenQr={() => { setShowQrModal(true); setIsHeaderProfileOpen(false); }}
               onSwitchAccount={() => { try { localStorage.removeItem('ukurair_auth_user'); } catch (e) {} setUser(null); setShowAccountChooser(false); setView('login'); setIsHeaderProfileOpen(false); }}
               onLogout={() => { handleLogout(); setIsHeaderProfileOpen(false); }}
               onLogin={() => { setView('login'); setIsHeaderProfileOpen(false); }}
@@ -4745,6 +4815,15 @@ const App = () => {
               onMouseOut={e => e.currentTarget.style.color = view === 'dashboard' && !selectedDevice ? '#38bdf8' : '#cbd5e1'}
               onClick={() => { setView('dashboard'); setSelectedDevice(null); }}
             />
+            <QrCode
+              size={18}
+              color="#38bdf8"
+              style={{ cursor: 'pointer', transition: 'transform 0.2s, color 0.2s' }}
+              title="Buka QR Code untuk demonstrasi di HP Dosen / Penguji"
+              onMouseOver={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.transform = 'scale(1.15)'; }}
+              onMouseOut={e => { e.currentTarget.style.color = '#38bdf8'; e.currentTarget.style.transform = 'scale(1)'; }}
+              onClick={() => setShowQrModal(true)}
+            />
           </div>
 
           {user ? (
@@ -4783,6 +4862,7 @@ const App = () => {
               onClose={() => setIsProfileMenuOpen(false)}
               onManageAdmin={() => { setView('admin'); setIsProfileMenuOpen(false); }}
               onOpenNotif={() => { setShowNotificationModal(true); setIsProfileMenuOpen(false); }}
+              onOpenQr={() => { setShowQrModal(true); setIsProfileMenuOpen(false); }}
               onSwitchAccount={() => { try { localStorage.removeItem('ukurair_auth_user'); } catch (e) {} setUser(null); setShowAccountChooser(false); setView('login'); setIsProfileMenuOpen(false); }}
               onLogout={() => { handleLogout(); setIsProfileMenuOpen(false); }}
               onLogin={() => { setView('login'); setIsProfileMenuOpen(false); }}
@@ -8090,6 +8170,18 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
           </div>
         </div>
       )}
+
+      {/* Modal Demonstrasi Kode QR (Untuk Buka di HP Dosen / Presentasi Sidang) */}
+      <QrCodeDemoModal
+        isOpen={showQrModal}
+        onClose={() => setShowQrModal(false)}
+        devices={devices}
+        activeDevice={selectedDevice}
+        onSelectDevice={(dev) => {
+          setSelectedDevice(dev);
+          setMainMapTarget({ lat: dev.lat, lng: dev.lng, zoom: 16, _ts: Date.now() });
+        }}
+      />
     </div>
   );
 };

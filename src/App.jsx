@@ -143,12 +143,22 @@ const normalizeReading = (item) => {
     if (!isNaN(num)) out.water_level = num;
   }
 
-  // Normalisasi IP dan MAC address jika menggunakan penamaan alternatif
+  // Normalisasi IP, MAC address, dan Device Name (Hostname ESP32 di Hotspot)
   if (!out.ip) {
     out.ip = item.ip_address || item.local_ip || item.ipAddress || null;
   }
   if (!out.mac) {
     out.mac = item.mac_address || item.physical_address || item.macAddress || null;
+  }
+  if (!out.device_name) {
+    out.device_name = item.device_name || item.deviceName || item.hostname || item.host_name || null;
+  }
+  // Jika device_name belum ada tapi MAC ada, turunkan default hostname standar ESP32: esp32-XXXXXX
+  if (!out.device_name && out.mac) {
+    const hex = String(out.mac).replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+    if (hex.length >= 6) {
+      out.device_name = `esp32-${hex.slice(-6)}`;
+    }
   }
 
   // Normalisasi Telemetri Catu Daya (Aki & Panel Surya)
@@ -1723,6 +1733,7 @@ const App = () => {
   const [newLng, setNewLng] = useState('104.052610'); // default Batam Lng
   const [newMac, setNewMac] = useState(''); // MAC Address ESP32 untuk identifikasi perangkat
   const [newIp, setNewIp] = useState(''); // IP Address ESP32
+  const [newDeviceName, setNewDeviceName] = useState(''); // Device Name / Hostname ESP32 (misal: esp32-ECB9E0)
 
   // Fitur Pencarian & Sugesti Alamat Lokasi di Peta
   const [adminTableSearch, setAdminTableSearch] = useState(''); // Pencarian tabel alat di panel admin
@@ -1742,6 +1753,7 @@ const App = () => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [editMacInput, setEditMacInput] = useState('');
   const [editIpInput, setEditIpInput] = useState('');
+  const [editDeviceNameInput, setEditDeviceNameInput] = useState('');
   const [editLatInput, setEditLatInput] = useState('');
   const [editLngInput, setEditLngInput] = useState('');
   const [showApiKeyValue, setShowApiKeyValue] = useState(false);
@@ -2097,6 +2109,11 @@ const App = () => {
             created_at: parseCreatedAt(dashData.created_at ?? devData.created_at),
             ip: dashData.ip || devData.ip || devReading.ip || null,
             mac: dashData.mac || devData.mac || devReading.mac || null,
+            device_name: dashData.device_name || devData.device_name || devReading.device_name || (
+              (dashData.mac || devData.mac || devReading.mac)
+                ? `esp32-${String(dashData.mac || devData.mac || devReading.mac).replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase()}`
+                : null
+            ),
             battery_volt: dashData.battery_volt ?? devReading.battery_volt ?? devData.battery_volt ?? null,
             battery_pct: dashData.battery_pct ?? devReading.battery_pct ?? devData.battery_pct ?? null,
             solar_charging: dashData.solar_charging ?? devReading.solar_charging ?? devData.solar_charging ?? null,
@@ -2866,9 +2883,11 @@ const App = () => {
         lng: parseFloat(newLng) || 104.053,
         created_at: new Date().toISOString()
       };
-      // Simpan MAC & IP jika diisi (untuk identifikasi & validasi perangkat)
+      // Simpan MAC, IP, dan Device Name jika diisi (untuk identifikasi & validasi perangkat)
       if (newMac.trim()) deviceData.mac = newMac.trim().toUpperCase();
       if (newIp.trim()) deviceData.ip = newIp.trim();
+      const cleanDevName = newDeviceName.trim() || (newMac.trim() ? `esp32-${newMac.trim().replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase()}` : '');
+      if (cleanDevName) deviceData.device_name = cleanDevName;
       await set(ref(db, `devices/${deviceKey}`), deviceData);
 
       // Also init dashboard (jangan simpan API key di sini: data dashboard dibaca publik)
@@ -2882,6 +2901,7 @@ const App = () => {
       };
       if (newMac.trim()) dashData.mac = newMac.trim().toUpperCase();
       if (newIp.trim()) dashData.ip = newIp.trim();
+      if (cleanDevName) dashData.device_name = cleanDevName;
       await set(ref(db, `dashboard/${deviceKey}`), dashData);
 
       const addedId = deviceKey;
@@ -2894,6 +2914,7 @@ const App = () => {
       setNewLng('104.053');
       setNewMac('');
       setNewIp('');
+      setNewDeviceName('');
       setAddressSearchQuery('');
       setAddressSuggestions([]);
       setSelectedAddressLabel('');
@@ -2964,12 +2985,18 @@ const App = () => {
 
   const openApiKeyModal = (device) => {
     const liveInfo = data.find(x => x.id === device.id) || device;
+    const defaultDevName = liveInfo.device_name || device.device_name || (
+      (liveInfo.mac || device.mac)
+        ? `esp32-${String(liveInfo.mac || device.mac).replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase()}`
+        : ''
+    );
     setApiKeyModalDevice(device);
     setEditNameInput(device.name || '');
     setEditIdInput(device.id || '');
     setApiKeyInput(device.secret_key || '');
     setEditMacInput(liveInfo.mac || device.mac || '');
     setEditIpInput(liveInfo.ip || device.ip || '');
+    setEditDeviceNameInput(defaultDevName);
     setEditLatInput(String(device.lat || liveInfo.lat || 1.128));
     setEditLngInput(String(device.lng || liveInfo.lng || 104.053));
     setShowApiKeyValue(false);
@@ -2986,6 +3013,7 @@ const App = () => {
     const newId = editIdInput.trim().replace(/[\.\#\$\[\]\/\s]/g, '-').replace(/-+/g, '-').toLowerCase();
     const cleanMac = editMacInput.trim().toUpperCase();
     const cleanIp = editIpInput.trim();
+    const cleanDevName = editDeviceNameInput.trim() || (cleanMac ? `esp32-${cleanMac.replace(/[^0-9A-Fa-f]/g, '').slice(-6)}` : '');
     const cleanLat = parseFloat(editLatInput) || 1.128;
     const cleanLng = parseFloat(editLngInput) || 104.053;
     const oldId = apiKeyModalDevice.id;
@@ -3039,6 +3067,7 @@ const App = () => {
         };
         if (cleanMac) newDeviceData.mac = cleanMac;
         if (cleanIp) newDeviceData.ip = cleanIp;
+        if (cleanDevName) newDeviceData.device_name = cleanDevName;
 
         const newDashData = {
           ...oldDashData,
@@ -3049,6 +3078,7 @@ const App = () => {
         };
         if (cleanMac) newDashData.mac = cleanMac;
         if (cleanIp) newDashData.ip = cleanIp;
+        if (cleanDevName) newDashData.device_name = cleanDevName;
 
         // 1. Simpan ke /dashboard baru (selalu diizinkan Firebase)
         let dashSaved = false;
@@ -3093,7 +3123,7 @@ const App = () => {
 
         alert(`Alat berhasil diperbarui!\nNama: ${cleanName}\nID Baru: ${newId}\n\nPerubahan sudah tersimpan dan langsung aktif.`);
       } else {
-        // Skenario B: ID Alat tetap, ubah Nama / API Key / MAC / IP / Koordinat
+        // Skenario B: ID Alat tetap, ubah Nama / API Key / MAC / IP / Device Name / Koordinat
         const devUpdates = {
           name: cleanName,
           secret_key: cleanKey,
@@ -3102,6 +3132,7 @@ const App = () => {
         };
         if (cleanMac) devUpdates.mac = cleanMac;
         if (cleanIp) devUpdates.ip = cleanIp;
+        if (cleanDevName) devUpdates.device_name = cleanDevName;
 
         const dashUpdates = {
           name: cleanName,
@@ -3110,6 +3141,7 @@ const App = () => {
         };
         if (cleanMac) dashUpdates.mac = cleanMac;
         if (cleanIp) dashUpdates.ip = cleanIp;
+        if (cleanDevName) dashUpdates.device_name = cleanDevName;
 
         // 1. Simpan ke /dashboard terlebih dahulu (node ini selalu diizinkan oleh Firebase)
         let dashSaved = false;
@@ -4874,14 +4906,20 @@ const App = () => {
                       </button>
                     )}
                   </div>
-                  {/* Informasi Jaringan Teknis (IP & MAC) khusus untuk ADMIN */}
+                  {/* Informasi Jaringan Teknis (Device Name, IP & MAC) khusus untuk ADMIN */}
                   {isAdminUser && (() => {
                     const currentDev = data.find(d => d.id === selectedDevice.id) || selectedDevice;
                     const devIp = currentDev?.ip;
                     const devMac = currentDev?.mac;
-                    if (!devIp && !devMac) return null;
+                    const devName = currentDev?.device_name || (devMac ? `esp32-${String(devMac).replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase()}` : null);
+                    if (!devIp && !devMac && !devName) return null;
                     return (
                       <div style={{ marginTop: '0.75rem', display: 'flex', gap: '8px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', fontSize: '0.72rem' }}>
+                        {devName && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.35)', padding: '3px 10px', borderRadius: '6px', fontFamily: 'monospace', fontWeight: 700 }} title="Device Name / Hostname ESP32 di Hotspot Wi-Fi (Hanya Admin)">
+                            <Radio size={12} /> {devName}
+                          </span>
+                        )}
                         {devIp && (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(56, 189, 248, 0.1)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '3px 10px', borderRadius: '6px', fontFamily: 'monospace' }} title="IP Address ESP32 (Hanya Admin)">
                             <Wifi size={12} /> {devIp}
@@ -6074,10 +6112,12 @@ const App = () => {
                         Total: <b style={{ color: '#38bdf8' }}>{devices.filter(d => {
                           if (!adminTableSearch.trim()) return true;
                           const q = adminTableSearch.toLowerCase().trim();
-                          return String(d.name || '').toLowerCase().includes(q) ||
+                          const live = data.find(x => x.id === d.id) || d;
+                          return String(d.name || live.name || '').toLowerCase().includes(q) ||
                             String(d.id || '').toLowerCase().includes(q) ||
-                            String(d.ip || '').toLowerCase().includes(q) ||
-                            String(d.mac || '').toLowerCase().includes(q);
+                            String(d.device_name || live.device_name || '').toLowerCase().includes(q) ||
+                            String(d.ip || live.ip || '').toLowerCase().includes(q) ||
+                            String(d.mac || live.mac || '').toLowerCase().includes(q);
                         }).length}</b> dari {devices.length} alat
                       </div>
                     </div>
@@ -6091,6 +6131,7 @@ const App = () => {
                             <th>Status Koneksi</th>
                             <th>Level Air</th>
                             <th>Catu Daya (Aki & Surya)</th>
+                            <th>Device Name (Hostname)</th>
                             <th>IP Address</th>
                             <th>MAC Address</th>
                             <th>API Key</th>
@@ -6101,15 +6142,20 @@ const App = () => {
                           {devices.filter(d => {
                             if (!adminTableSearch.trim()) return true;
                             const q = adminTableSearch.toLowerCase().trim();
-                            return String(d.name || '').toLowerCase().includes(q) ||
+                            const live = data.find(x => x.id === d.id) || d;
+                            return String(d.name || live.name || '').toLowerCase().includes(q) ||
                               String(d.id || '').toLowerCase().includes(q) ||
-                              String(d.ip || '').toLowerCase().includes(q) ||
-                              String(d.mac || '').toLowerCase().includes(q);
+                              String(d.device_name || live.device_name || '').toLowerCase().includes(q) ||
+                              String(d.ip || live.ip || '').toLowerCase().includes(q) ||
+                              String(d.mac || live.mac || '').toLowerCase().includes(q);
                           }).map(d => {
                             const liveInfo = data.find(x => x.id === d.id) || d;
                             const eff = getDeviceEffectiveData(liveInfo);
                             const deviceIp = liveInfo.ip || d.ip || null;
                             const deviceMac = liveInfo.mac || d.mac || null;
+                            const deviceName = liveInfo.device_name || d.device_name || (
+                              deviceMac ? `esp32-${String(deviceMac).replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase()}` : null
+                            );
 
                             return (
                               <tr key={d.id}>
@@ -6217,6 +6263,30 @@ const App = () => {
                                       </div>
                                     );
                                   })()}
+                                </td>
+                                <td>
+                                  {deviceName ? (
+                                    <span
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '5px',
+                                        background: 'rgba(56, 189, 248, 0.15)',
+                                        color: '#38bdf8',
+                                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                                        padding: '3px 8px',
+                                        borderRadius: '5px',
+                                        fontSize: '0.78rem',
+                                        fontFamily: 'monospace',
+                                        fontWeight: 600
+                                      }}
+                                      title="Device Name / Hostname ESP32 di Hotspot Wi-Fi"
+                                    >
+                                      <Radio size={12} /> {deviceName}
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>-</span>
+                                  )}
                                 </td>
                                 <td>
                                   {deviceIp ? (
@@ -6443,8 +6513,38 @@ const App = () => {
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '1rem', marginBottom: '0rem' }}>
-                          <div className="form-group" style={{ flex: 1 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>Device Name (Hostname)</span>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>(Hotspot Wi-Fi)</span>
+                            </label>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <input
+                                value={newDeviceName}
+                                onChange={e => setNewDeviceName(e.target.value)}
+                                placeholder="esp32-ECB9E0"
+                                style={{ fontFamily: 'monospace' }}
+                              />
+                              <button
+                                type="button"
+                                className="btn"
+                                style={{ padding: '0 8px', fontSize: '0.68rem', border: '1px solid var(--accent)', color: 'var(--accent)', whiteSpace: 'nowrap' }}
+                                title="Ambil otomatis dari 6 digit terakhir MAC Address"
+                                onClick={() => {
+                                  if (newMac.trim()) {
+                                    const hex = newMac.replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase();
+                                    setNewDeviceName(`esp32-${hex}`);
+                                  } else {
+                                    alert('Masukkan MAC Address terlebih dahulu untuk generate nama hostname otomatis!');
+                                  }
+                                }}
+                              >
+                                Auto
+                              </button>
+                            </div>
+                          </div>
+                          <div className="form-group" style={{ margin: 0 }}>
                             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span>MAC Address ESP32</span>
                               <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>(Opsional)</span>
@@ -6459,14 +6559,18 @@ const App = () => {
                                 for (let i = 0; i < hex.length; i += 2) {
                                   parts.push(hex.substring(i, i + 2));
                                 }
-                                setNewMac(parts.join(':'));
+                                const formatted = parts.join(':');
+                                setNewMac(formatted);
+                                if (!newDeviceName && hex.length >= 6) {
+                                  setNewDeviceName(`esp32-${hex.slice(-6)}`);
+                                }
                               }}
                               placeholder="Contoh: 4C:C3:82:EC:B9:E0"
                               maxLength={17}
                               style={{ fontFamily: 'monospace' }}
                             />
                           </div>
-                          <div className="form-group" style={{ flex: 1 }}>
+                          <div className="form-group" style={{ margin: 0 }}>
                             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                               <span>IP Address</span>
                               <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>(Opsional)</span>
@@ -6479,8 +6583,8 @@ const App = () => {
                             />
                           </div>
                         </div>
-                        <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '-0.5rem', marginBottom: '1rem', lineHeight: 1.5 }}>
-                          MAC Address unik setiap ESP32 — digunakan untuk memastikan data dari perangkat yang benar (mencegah bentrok ESP1 & ESP2). Jalankan <code style={{ color: 'var(--accent)' }}>WiFi.macAddress()</code> di Serial Monitor untuk melihat MAC ESP Anda.
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '0', marginBottom: '1rem', lineHeight: 1.5 }}>
+                          Device Name / Hostname (misal: <code>esp32-ECB9E0</code>) terbaca otomatis di Windows Mobile Hotspot / Router sesuai 6 digit terakhir MAC Address ESP32.
                         </p>
 
                         <div className="form-group" style={{ marginBottom: '1.25rem', position: 'relative' }}>
@@ -7072,6 +7176,52 @@ const App = () => {
                     </div>
                   </div>
 
+                  {/* Device Name / Hostname ESP32 di Hotspot Wi-Fi */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '0.78rem', fontWeight: 600, color: '#e2e8f0', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Radio size={13} color="#38bdf8" /> Device Name / Hostname ESP32 (Hotspot Wi-Fi)
+                      </label>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ padding: '2px 8px', fontSize: '0.68rem', border: '1px solid var(--accent)', color: 'var(--accent)', background: 'transparent' }}
+                        title="Ambil otomatis esp32-XXXXXX dari 6 digit terakhir MAC Address"
+                        onClick={() => {
+                          const macSource = editMacInput || apiKeyModalDevice?.mac;
+                          if (macSource) {
+                            const hex = macSource.replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase();
+                            setEditDeviceNameInput(`esp32-${hex}`);
+                          } else {
+                            alert('Masukkan MAC Address terlebih dahulu untuk auto-generate Device Name!');
+                          }
+                        }}
+                      >
+                        Auto dari MAC
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={editDeviceNameInput}
+                      onChange={e => setEditDeviceNameInput(e.target.value)}
+                      placeholder="Contoh: esp32-ECB9E0"
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        background: '#0f172a',
+                        border: '1px solid #334155',
+                        borderRadius: '8px',
+                        color: '#38bdf8',
+                        fontFamily: 'monospace',
+                        fontWeight: 600,
+                        fontSize: '0.82rem'
+                      }}
+                    />
+                    <p style={{ fontSize: '0.68rem', color: '#94a3b8', marginTop: '4px', marginBottom: 0 }}>
+                      Nama perangkat yang terbaca di Windows Mobile Hotspot / Router Wi-Fi (misal: <code>esp32-ECB9E0</code>).
+                    </p>
+                  </div>
+
                   {/* 2 Kolom: MAC Address & IP Address */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                     <div>
@@ -7089,7 +7239,11 @@ const App = () => {
                           for (let i = 0; i < hex.length; i += 2) {
                             parts.push(hex.substring(i, i + 2));
                           }
-                          setEditMacInput(parts.join(':'));
+                          const formatted = parts.join(':');
+                          setEditMacInput(formatted);
+                          if (!editDeviceNameInput && hex.length >= 6) {
+                            setEditDeviceNameInput(`esp32-${hex.slice(-6)}`);
+                          }
                         }}
                         placeholder="Contoh: 4C:C3:82:EC:B9:E0"
                         maxLength={17}
@@ -7241,7 +7395,8 @@ const App = () => {
                       <button
                         type="button"
                         onClick={async () => {
-                          const snippet = `// =========================================================================\n// IDENTITAS ALAT & FIREBASE (SUDAH TERDAFTAR DI WEB: ${editNameInput})\n// =========================================================================\nconst String ID_ALAT       = "${editIdInput || apiKeyModalDevice.id}";\nconst String API_KEY_ALAT  = "${apiKeyInput}";\nconst String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.firebaseio.com";`;
+                          const devNameToUse = editDeviceNameInput || (editMacInput ? `esp32-${editMacInput.replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase()}` : 'esp32-ECB9E0');
+                          const snippet = `// =========================================================================\n// IDENTITAS ALAT & FIREBASE (SUDAH TERDAFTAR DI WEB: ${editNameInput})\n// =========================================================================\nconst String ID_ALAT       = "${editIdInput || apiKeyModalDevice.id}";\nconst String API_KEY_ALAT  = "${apiKeyInput}";\nconst String DEVICE_NAME   = "${devNameToUse}";\nconst String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.firebaseio.com";\n\n// Di dalam void setup() sebelum WiFi.begin:\n// WiFi.setHostname(DEVICE_NAME.c_str());`;
                           const ok = await copyToClipboard(snippet);
                           if (ok) { setCopiedSnippet(true); setTimeout(() => setCopiedSnippet(false), 1500); }
                         }}
@@ -7268,7 +7423,11 @@ const App = () => {
 // =========================================================================
 const String ID_ALAT       = "${editIdInput || apiKeyModalDevice.id}";
 const String API_KEY_ALAT  = "${apiKeyInput}";
-const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.firebaseio.com";`}
+const String DEVICE_NAME   = "${editDeviceNameInput || (editMacInput ? `esp32-${editMacInput.replace(/[^0-9A-Fa-f]/g, '').slice(-6).toUpperCase()}` : 'esp32-ECB9E0')}";
+const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.firebaseio.com";
+
+// Di dalam void setup() sebelum WiFi.begin():
+// WiFi.setHostname(DEVICE_NAME.c_str());`}
                     </pre>
                   </div>
 
@@ -7278,9 +7437,9 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                     ESP32 Anda cukup mengirim HTTP PUT/PATCH ke path <code style={{ color: '#38bdf8' }}>{`/dashboard/${editIdInput || apiKeyModalDevice.id}.json`}</code> dengan payload JSON:
                     <br />
                     <code style={{ display: 'block', background: '#0b1120', padding: '6px 10px', borderRadius: '6px', color: '#a78bfa', marginTop: '4px', fontFamily: 'monospace' }}>
-                      {`{"water_level": 35, "status": "AMAN", "api_key": "${apiKeyInput.substring(0, 8)}..."}`}
+                      {`{"water_level": 35, "status": "AMAN", "device_name": "${editDeviceNameInput || 'esp32-ECB9E0'}", "api_key": "${apiKeyInput.substring(0, 8)}..."}`}
                     </code>
-                    Data ketinggian air akan langsung muncul secara *real-time* di indikator web dan marker peta wilayah <b>{editNameInput}</b>!
+                    Data ketinggian air dan identitas Hostname akan langsung muncul secara *real-time* di indikator web dan marker peta wilayah <b>{editNameInput}</b>!
                   </div>
 
                 </div>

@@ -287,7 +287,8 @@ export const SimulationControlPanel = ({
   setSimulatedValue,
   showZones,
   setShowZones,
-  onOpenEditRange
+  onOpenEditRange,
+  onOpenManualControl
 }) => {
   // Pada layar ponsel (mobile), defaultkan ke tertutup (collapsed) agar tidak memenuhi layar
   const [collapsed, setCollapsed] = useState(() => {
@@ -385,6 +386,33 @@ export const SimulationControlPanel = ({
                 <span>300 cm</span>
               </div>
             </div>
+          )}
+
+          {onOpenManualControl && (
+            <button
+              type="button"
+              onClick={onOpenManualControl}
+              style={{
+                width: '100%',
+                marginTop: '8px',
+                padding: '7px 10px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(56, 189, 248, 0.15))',
+                border: '1px solid #38bdf8',
+                color: '#38bdf8',
+                fontWeight: 800,
+                fontSize: '0.74rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease'
+              }}
+              title="Set Ketinggian Air Manual (0 - 100 cm) langsung ke Firebase RTDB untuk Demo Dosen"
+            >
+              <Sliders size={13} /> 🎛️ Kontrol Ketinggian Manual (0-100cm)
+            </button>
           )}
 
           {onOpenEditRange && (

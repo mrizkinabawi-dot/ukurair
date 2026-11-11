@@ -19,6 +19,10 @@ import {
   checkUserLocationSafety
 } from './UserLocationRouting';
 import {
+  ManualWaterLevelModal,
+  DeviceDetailManualControlWidget
+} from './ManualWaterLevelModal';
+import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine
 } from 'recharts';
 import {
@@ -1190,6 +1194,7 @@ const App = () => {
   const [simulatedValue, setSimulatedValue] = useState(80);
   const [showFloodZones, setShowFloodZones] = useState(true);
   const [editingRangeDevice, setEditingRangeDevice] = useState(null);
+  const [manualControlModalDevice, setManualControlModalDevice] = useState(null);
   const [isDrawingRoad, setIsDrawingRoad] = useState(false);
   const [activeDrawPoints, setActiveDrawPoints] = useState([]);
   const { zones: floodZones, loadingZones, saveZone, deleteZone } = useFloodZones();
@@ -1202,7 +1207,10 @@ const App = () => {
     if (!isAdminUser && editingRangeDevice) {
       setEditingRangeDevice(null);
     }
-  }, [isAdminUser, isSimulationMode, editingRangeDevice]);
+    if (!isAdminUser && manualControlModalDevice) {
+      setManualControlModalDevice(null);
+    }
+  }, [isAdminUser, isSimulationMode, editingRangeDevice, manualControlModalDevice]);
 
   // ─── State Deteksi Lokasi Pengguna & Cek Rute Aman Banjir (Google Maps Style) ──
   const [userLocation, setUserLocation] = useState(null);
@@ -1439,8 +1447,10 @@ const App = () => {
   };
 
   // Periksa apakah ESP32 terhubung (mengirim data dalam rentang sensorTimeoutMinutes)
+  // JIKA kontrol manual aktif (device.manual_control === true), otomatis selalu terhubung (Online)
   const isDeviceOnline = (device) => {
     if (!device) return false;
+    if (device.manual_control) return true;
     const ts = parseCreatedAt(device.created_at, 0);
     const lastHeard = lastHeardMap[device.id] || 0;
     const bestTs = Math.max(ts, lastHeard);
@@ -1451,20 +1461,105 @@ const App = () => {
   };
 
   // Helper data efektif: jika terputus, level air menjadi 0 cm dan status TERPUTUS (OFF)
+  // JIKA kontrol manual aktif, level diambil dari device.water_level dan status dihitung dari getWaterStatus
   const getDeviceEffectiveData = (device) => {
-    if (!device) return { isOnline: false, water_level: 0, status: 'TERPUTUS', lastSeenText: 'Belum ada sinyal' };
+    if (!device) return { isOnline: false, water_level: 0, status: 'TERPUTUS', lastSeenText: 'Belum ada sinyal', isManual: false };
     const isOnline = isDeviceOnline(device);
     const ts = parseCreatedAt(device.created_at, 0);
     const lastHeard = lastHeardMap[device.id] || 0;
     const bestTs = Math.max(ts, lastHeard);
-    const lastSeenText = formatLastSeenTime(bestTs, currentTime);
+    const isManual = !!device.manual_control;
+    const lastSeenText = isManual ? 'Mode Manual (Presentasi)' : formatLastSeenTime(bestTs, currentTime);
+
+    const rawLevel = Number(device.water_level) || 0;
+    const effectiveWaterLevel = isOnline ? rawLevel : 0;
+    const effectiveStatus = isOnline
+      ? (isManual ? getWaterStatus(effectiveWaterLevel).status : (device.status || 'AMAN'))
+      : 'TERPUTUS';
 
     return {
       isOnline,
-      water_level: isOnline ? (Number(device.water_level) || 0) : 0,
-      status: isOnline ? (device.status || 'AMAN') : 'TERPUTUS',
-      lastSeenText
+      water_level: effectiveWaterLevel,
+      status: effectiveStatus,
+      lastSeenText,
+      isManual
     };
+  };
+
+  // List perangkat dengan nilai & status efektif terhitung (Online/Offline, Manual Override)
+  const effectiveDevices = useMemo(() => {
+    return data.map(d => {
+      const eff = getDeviceEffectiveData(d);
+      return {
+        ...d,
+        isOnline: eff.isOnline,
+        water_level: eff.water_level,
+        status: eff.status,
+        lastSeenText: eff.lastSeenText,
+        isManual: eff.isManual
+      };
+    });
+  }, [data, lastHeardMap, currentTime, sensorTimeoutMinutes]);
+
+  /**
+   * Set Kontrol Manual Ketinggian Air (Khusus Admin - Mode Presentasi Dosen)
+   * Menyimpan ke Firebase Realtime Database (/dashboard dan /measurements)
+   * sehingga anggota, dosen, dan pengunjung melihat data berubah secara real-time.
+   *
+   * @param {string} deviceId - ID Perangkat (ESP ID)
+   * @param {boolean} isManualOn - true = Manual ON (0-100cm), false = Manual OFF (Fisik)
+   * @param {number} levelCm - Ketinggian air 0 - 100 cm
+   */
+  const handleSaveManualWaterLevel = async (deviceId, isManualOn, levelCm = 0) => {
+    if (!isAdminUser) {
+      alert('Akses Ditolak: Fitur kontrol manual hanya untuk Admin.');
+      return { success: false };
+    }
+
+    try {
+      const targetRef = ref(db, `dashboard/${deviceId}`);
+      const clampedLevel = Math.max(0, Math.min(100, Math.round(Number(levelCm) || 0)));
+      const statusInfo = getWaterStatus(clampedLevel);
+
+      if (isManualOn) {
+        const payload = {
+          water_level: clampedLevel,
+          status: statusInfo.status,
+          manual_control: true,
+          created_at: Date.now()
+        };
+        await update(targetRef, payload);
+
+        // Catat ke measurements agar grafik riwayat juga terisi real-time
+        try {
+          await push(ref(db, `measurements/${deviceId}`), {
+            water_level: clampedLevel,
+            status: statusInfo.status,
+            created_at: Date.now()
+          });
+        } catch (e) {
+          console.warn('Gagal mencatat history measurement manual:', e);
+        }
+
+        setLastHeardMap(prev => ({ ...prev, [deviceId]: Date.now() }));
+      } else {
+        // Kontrol Manual OFF: Kembalikan ke mode sensor asli
+        // Jika tidak ada sensor IoT fisik aktif, status kembali ke TERPUTUS (OFF)
+        const payload = {
+          manual_control: false,
+          water_level: 0,
+          status: 'TERPUTUS',
+          created_at: Date.now() - (24 * 60 * 60 * 1000)
+        };
+        await update(targetRef, payload);
+        setLastHeardMap(prev => ({ ...prev, [deviceId]: 0 }));
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Gagal memperbarui kontrol manual:', err);
+      throw err;
+    }
   };
 
   // Simulasi Heartbeat (Untuk testing Admin: membuat alat Online 🟢 atau Terputus 🔴)
@@ -2004,7 +2099,8 @@ const App = () => {
             mac: dashData.mac || devData.mac || devReading.mac || null,
             battery_volt: dashData.battery_volt ?? devReading.battery_volt ?? devData.battery_volt ?? null,
             battery_pct: dashData.battery_pct ?? devReading.battery_pct ?? devData.battery_pct ?? null,
-            solar_charging: dashData.solar_charging ?? devReading.solar_charging ?? devData.solar_charging ?? null
+            solar_charging: dashData.solar_charging ?? devReading.solar_charging ?? devData.solar_charging ?? null,
+            manual_control: !!(dashData.manual_control ?? devData.manual_control ?? false)
           };
         })
         // Tampilkan alat yang sudah terdaftar (boleh meski belum ada data pengukuran)
@@ -3890,6 +3986,30 @@ const App = () => {
                             <Sliders size={13} /> Atur Range
                           </button>
                         )}
+                        {isAdminUser && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setManualControlModalDevice(device);
+                            }}
+                            title="Set Ketinggian Air Manual (0 - 100 cm) untuk Demo Presentasi Dosen (Khusus Admin)"
+                            style={{
+                              background: (device.manual_control || eff.isManual) ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.2)',
+                              color: (device.manual_control || eff.isManual) ? '#22c55e' : '#f59e0b',
+                              border: `1px solid ${(device.manual_control || eff.isManual) ? '#16a34a' : '#d97706'}`,
+                              borderRadius: '6px',
+                              padding: '4px 10px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <Sliders size={13} /> {(device.manual_control || eff.isManual) ? `Manual ON (${eff.water_level}cm)` : 'Set Manual (0-100cm)'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   </Popup>
@@ -3906,7 +4026,7 @@ const App = () => {
             {/* ─── Badge Ketinggian Air Mengambang di Peta (Google Maps Traffic Style) ── */}
             {/* Memungkinkan pengguna di luar area melihat tinggi air tiap wilayah secara langsung */}
             <FloodTrafficBadgeLayer
-              deviceData={data}
+              deviceData={effectiveDevices}
               floodZones={floodZones}
               isSimulationMode={isSimulationMode}
               simulatedValue={simulatedValue}
@@ -3932,7 +4052,7 @@ const App = () => {
                   color: '#facc15',
                   name: 'Sedang Ditandai di Peta'
                 } : null}
-                deviceData={data}
+                deviceData={effectiveDevices}
               />
             )}
           </MapContainer>
@@ -3952,7 +4072,7 @@ const App = () => {
       {/* ─── Ringkasan Ketinggian Air Seluruh Wilayah (Untuk Pengguna di Luar Area) ─── */}
       {(view === 'dashboard' || view === 'device-detail') && !isNavSidebarOpen && (
         <FloodOverviewDrawer
-          deviceData={data}
+          deviceData={effectiveDevices}
           isSimulationMode={isSimulationMode}
           simulatedValue={simulatedValue}
           userLocation={userLocation}
@@ -3973,6 +4093,7 @@ const App = () => {
           showZones={showFloodZones}
           setShowZones={setShowFloodZones}
           onOpenEditRange={() => setEditingRangeDevice(selectedDevice || data[0])}
+          onOpenManualControl={() => setManualControlModalDevice(selectedDevice || data[0])}
         />
       )}
 
@@ -4016,6 +4137,17 @@ const App = () => {
           setIsDrawingRoad={setIsDrawingRoad}
           activeDrawPoints={activeDrawPoints}
           setActiveDrawPoints={setActiveDrawPoints}
+          isAdminUser={isAdminUser}
+        />
+      )}
+
+      {/* ─── Modal: Kontrol Ketinggian Air Manual (Khusus Admin / Demo Dosen) ─── */}
+      {manualControlModalDevice && isAdminUser && (
+        <ManualWaterLevelModal
+          device={manualControlModalDevice}
+          allDevices={data}
+          onClose={() => setManualControlModalDevice(null)}
+          onSaveManual={handleSaveManualWaterLevel}
           isAdminUser={isAdminUser}
         />
       )}
@@ -4712,6 +4844,34 @@ const App = () => {
                         <Sliders size={14} /> Atur Range & Jarak
                       </button>
                     )}
+                    {isAdminUser && (
+                      <button
+                        onClick={() => setManualControlModalDevice(data.find(d => d.id === selectedDevice.id) || selectedDevice)}
+                        style={{
+                          background: (selectedDevice.manual_control || data.find(d => d.id === selectedDevice.id)?.manual_control) ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.2)',
+                          border: `1px solid ${(selectedDevice.manual_control || data.find(d => d.id === selectedDevice.id)?.manual_control) ? '#16a34a' : '#d97706'}`,
+                          color: (selectedDevice.manual_control || data.find(d => d.id === selectedDevice.id)?.manual_control) ? '#22c55e' : '#f59e0b',
+                          borderRadius: '20px',
+                          padding: '4px 12px',
+                          fontSize: '0.75rem',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          fontWeight: 700,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.background = '#d97706'; e.currentTarget.style.color = '#ffffff'; }}
+                        onMouseOut={e => {
+                          const isMan = (selectedDevice.manual_control || data.find(d => d.id === selectedDevice.id)?.manual_control);
+                          e.currentTarget.style.background = isMan ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.2)';
+                          e.currentTarget.style.color = isMan ? '#22c55e' : '#f59e0b';
+                        }}
+                        title="Set Ketinggian Air Manual 0 - 100 cm untuk Presentasi Dosen (Khusus Admin)"
+                      >
+                        <Sliders size={14} /> {(selectedDevice.manual_control || data.find(d => d.id === selectedDevice.id)?.manual_control) ? `Manual ON (${getDeviceEffectiveData(data.find(d => d.id === selectedDevice.id) || selectedDevice).water_level}cm)` : 'Set Manual (0-100cm)'}
+                      </button>
+                    )}
                   </div>
                   {/* Informasi Jaringan Teknis (IP & MAC) khusus untuk ADMIN */}
                   {isAdminUser && (() => {
@@ -4735,6 +4895,15 @@ const App = () => {
                     );
                   })()}
                 </div>
+
+                {/* Widget Kontrol Manual Sensor Khusus Admin (Mode Presentasi Dosen) */}
+                {isAdminUser && (
+                  <DeviceDetailManualControlWidget
+                    device={data.find(d => d.id === selectedDevice.id) || selectedDevice}
+                    onSaveManual={handleSaveManualWaterLevel}
+                    isAdminUser={isAdminUser}
+                  />
+                )}
 
                 {/* Laporan & Diagnostik AI Real-Time (Publik) */}
                 {(() => {
@@ -6083,6 +6252,24 @@ const App = () => {
                                   </div>
                                 </td>
                                 <td style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                  <button
+                                    className="btn"
+                                    title="Atur Ketinggian Air Manual (0 - 100 cm) untuk Demo Presentasi Dosen"
+                                    style={{
+                                      border: `1px solid ${d.manual_control ? '#16a34a' : '#d97706'}`,
+                                      color: d.manual_control ? '#22c55e' : '#f59e0b',
+                                      background: d.manual_control ? 'rgba(34, 197, 94, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                      fontSize: '0.68rem',
+                                      padding: '4px 8px',
+                                      whiteSpace: 'nowrap',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }}
+                                    onClick={() => setManualControlModalDevice(d)}
+                                  >
+                                    <Sliders size={11} /> {d.manual_control ? `Manual (${eff.water_level}cm)` : 'Set Manual'}
+                                  </button>
                                   <button
                                     className="btn"
                                     title={eff.isOnline ? "Simulasikan sensor terputus (OFF)" : "Simulasikan sensor terhubung kembali (Online)"}

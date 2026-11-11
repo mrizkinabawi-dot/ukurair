@@ -1788,6 +1788,147 @@ td {
   flex-direction: column;
 }
 
+/* ─── Modal Kontrol Ketinggian Air Manual (Khusus Admin / Demo Dosen) ─── */
+.manual-control-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.manual-control-modal-card {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
+  color: #f8fafc;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalScaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.manual-modal-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(30, 41, 59, 0.5);
+}
+
+.manual-modal-close-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.manual-modal-close-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.manual-modal-body {
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(90vh - 120px);
+}
+
+.manual-modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  background: rgba(30, 41, 59, 0.5);
+  flex-wrap: wrap;
+}
+
+.manual-btn-cancel {
+  background: rgba(51, 65, 85, 0.5);
+  border: 1px solid #334155;
+  color: #cbd5e1;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.manual-btn-cancel:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+.manual-btn-off {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid #ef4444;
+  color: #f87171;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.manual-btn-off:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.manual-btn-save {
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  border: 1px solid #38bdf8;
+  color: #ffffff;
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+}
+
+.manual-btn-save:hover {
+  background: linear-gradient(135deg, #0369a1, #0284c7);
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.5);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    MOBILE SCREEN OPTIMIZATION (max-width: 768px)
    ═══════════════════════════════════════════════════════════════════════ */
@@ -1895,6 +2036,18 @@ td {
   }
 
   .edit-range-modal-card {
+    max-height: 88vh !important;
+    border-radius: 20px 20px 10px 10px !important;
+    margin-bottom: env(safe-area-inset-bottom, 0px) !important;
+  }
+
+  /* Modal Kontrol Manual di HP */
+  .manual-control-modal-overlay {
+    padding: 8px !important;
+    align-items: flex-end !important;
+  }
+
+  .manual-control-modal-card {
     max-height: 88vh !important;
     border-radius: 20px 20px 10px 10px !important;
     margin-bottom: env(safe-area-inset-bottom, 0px) !important;

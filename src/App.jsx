@@ -1145,6 +1145,58 @@ const ProfileChromePopup = ({
   );
 };
 
+// Pembersih kuota localStorage otomatis (membersihkan string foto raksasa dari savedAccounts & registeredUsers)
+const sanitizeLocalStorageQuota = () => {
+  try {
+    const rawSaved = localStorage.getItem('savedAccounts');
+    if (rawSaved) {
+      const list = JSON.parse(rawSaved);
+      if (Array.isArray(list)) {
+        let dirty = false;
+        const cleaned = list.map(item => {
+          if (item?.photoURL && typeof item.photoURL === 'string' && item.photoURL.length > 500) {
+            dirty = true;
+            return { ...item, photoURL: null };
+          }
+          return item;
+        });
+        if (dirty) {
+          localStorage.setItem('savedAccounts', JSON.stringify(cleaned));
+        }
+      }
+    }
+
+    const rawReg = localStorage.getItem('ukurair_registered_users');
+    if (rawReg) {
+      const list = JSON.parse(rawReg);
+      if (Array.isArray(list)) {
+        let dirty = false;
+        const cleaned = list.map(item => {
+          if (item?.photoURL && typeof item.photoURL === 'string' && item.photoURL.length > 500) {
+            dirty = true;
+            return { ...item, photoURL: null };
+          }
+          return item;
+        });
+        if (dirty) {
+          localStorage.setItem('ukurair_registered_users', JSON.stringify(cleaned));
+        }
+      }
+    }
+
+    // Jika ada ukurair_user_photo lama yang berukuran sangat besar (> 150KB), hapus agar tidak memicu QuotaExceededError
+    const rawPhoto = localStorage.getItem('ukurair_user_photo');
+    if (rawPhoto && rawPhoto.length > 150000) {
+      localStorage.removeItem('ukurair_user_photo');
+    }
+  } catch (err) {
+    console.warn('Storage quota sanitizer:', err);
+  }
+};
+
+// Jalankan sanitasi kuota sebelum render pertama
+sanitizeLocalStorageQuota();
+
 const App = () => {
   const [view, setView] = useState(() => {
     if (typeof window !== 'undefined' && (window.location.pathname === '/signin' || window.location.pathname === '/login' || window.location.hash === '#login')) {
@@ -1794,8 +1846,36 @@ const App = () => {
   const [loginPass, setLoginPass] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState('');
+  const safeSaveAccounts = (accounts) => {
+    try {
+      const sanitized = (accounts || []).map(a => {
+        if (a?.photoURL && typeof a.photoURL === 'string' && a.photoURL.length > 500) {
+          return { ...a, photoURL: null };
+        }
+        return a;
+      });
+      localStorage.setItem('savedAccounts', JSON.stringify(sanitized));
+    } catch (e) {
+      console.warn('Gagal menyimpan savedAccounts (diabaikan):', e);
+      try {
+        const minimal = (accounts || []).map(a => ({ email: a.email, name: a.name, photoURL: null }));
+        localStorage.setItem('savedAccounts', JSON.stringify(minimal));
+      } catch (inner) {}
+    }
+  };
+
   const [savedAccounts, setSavedAccounts] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('savedAccounts')) || []; } catch (e) { return []; }
+    try {
+      const raw = localStorage.getItem('savedAccounts');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map(a => (a?.photoURL && typeof a.photoURL === 'string' && a.photoURL.length > 500 ? { ...a, photoURL: null } : a));
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
   });
   const [showAccountChooser, setShowAccountChooser] = useState(false);
 
@@ -2531,10 +2611,10 @@ const App = () => {
       setUser(userObj);
       try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (err) {}
 
-      const account = { email: userObj.email, name: userObj.displayName, photoURL: userObj.photoURL };
-      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
+      const account = { email: userObj.email, name: userObj.displayName, photoURL: null };
+      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email).map(a => ({ ...a, photoURL: null }))];
       setSavedAccounts(newSaved);
-      localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
+      safeSaveAccounts(newSaved);
 
       setView(isAdminEmail(userObj.email) ? 'admin' : 'dashboard');
       return;
@@ -2562,10 +2642,10 @@ const App = () => {
       setUser(userObj);
       try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (err) {}
 
-      const account = { email: userObj.email, name: userObj.displayName, photoURL: userObj.photoURL };
-      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
+      const account = { email: userObj.email, name: userObj.displayName, photoURL: null };
+      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email).map(a => ({ ...a, photoURL: null }))];
       setSavedAccounts(newSaved);
-      localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
+      safeSaveAccounts(newSaved);
 
       setView(isAdminEmail(userObj.email) ? 'admin' : 'dashboard');
       return;
@@ -2594,10 +2674,10 @@ const App = () => {
       setUser(userObj);
       try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (err) {}
 
-      const account = { email: emailNorm, name: 'Muhamad', photoURL: existingPhoto || null };
-      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
+      const account = { email: emailNorm, name: 'Muhamad', photoURL: null };
+      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email).map(a => ({ ...a, photoURL: null }))];
       setSavedAccounts(newSaved);
-      localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
+      safeSaveAccounts(newSaved);
 
       setView('admin');
       return;
@@ -2633,7 +2713,7 @@ const App = () => {
           password: loginPass,
           name: displayName,
           uid: userObj.uid,
-          photoURL: userObj.photoURL || null
+          photoURL: null
         };
         localUsers = [newRecord, ...localUsers.filter(u => u.email.toLowerCase() !== userObj.email.toLowerCase())];
         localStorage.setItem('ukurair_registered_users', JSON.stringify(localUsers));
@@ -2649,10 +2729,10 @@ const App = () => {
       setUser(userSession);
       try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userSession)); } catch (e) {}
 
-      const account = { email: userObj.email, name: displayName, photoURL: userObj.photoURL };
-      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
+      const account = { email: userObj.email, name: displayName, photoURL: null };
+      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email).map(a => ({ ...a, photoURL: null }))];
       setSavedAccounts(newSaved);
-      localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
+      safeSaveAccounts(newSaved);
 
       setView(isAdminEmail(userObj.email) ? 'admin' : 'dashboard');
     } catch (e) {
@@ -2734,7 +2814,7 @@ const App = () => {
           password: loginPass,
           name: displayName,
           uid: userObj.uid,
-          photoURL: customPhoto || userObj.photoURL || null
+          photoURL: null
         };
         localUsers = [newRecord, ...localUsers.filter(u => u.email.toLowerCase() !== userObj.email.toLowerCase())];
         localStorage.setItem('ukurair_registered_users', JSON.stringify(localUsers));
@@ -2753,17 +2833,23 @@ const App = () => {
       const account = {
         email: userObj.email,
         name: displayName,
-        photoURL: customPhoto || userObj.photoURL || null
+        photoURL: null
       };
-      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
+      const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email).map(a => ({ ...a, photoURL: null }))];
       setSavedAccounts(newSaved);
-      localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
+      safeSaveAccounts(newSaved);
 
       setRecoverySuccessMsg(`Selamat datang, ${displayName}! Akun berhasil dibuat.`);
       setTimeout(() => setRecoverySuccessMsg(''), 5000);
       setView(isAdminEmail(userObj.email) ? 'admin' : 'dashboard');
     } catch (err) {
-      setError('Gagal mendaftar: ' + err.message);
+      if (err.code === 'auth/email-already-in-use') {
+        setError('Email sudah terdaftar. Silakan langsung login.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('Kata sandi terlalu lemah (minimal 6 karakter).');
+      } else {
+        setError('Gagal mendaftar: ' + (err.message || 'Terjadi kendala sistem'));
+      }
     }
   };
 

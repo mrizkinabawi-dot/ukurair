@@ -3830,6 +3830,7 @@ const App = () => {
             {data.map(device => {
               const lat = device.lat || 1.128;
               const lng = device.lng || 104.053;
+              const eff = getDeviceEffectiveData(device);
               return (
                 <Marker
                   key={device.id}
@@ -3994,9 +3995,9 @@ const App = () => {
                             }}
                             title="Set Ketinggian Air Manual (0 - 100 cm) untuk Demo Presentasi Dosen (Khusus Admin)"
                             style={{
-                              background: (device.manual_control || eff.isManual) ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.2)',
-                              color: (device.manual_control || eff.isManual) ? '#22c55e' : '#f59e0b',
-                              border: `1px solid ${(device.manual_control || eff.isManual) ? '#16a34a' : '#d97706'}`,
+                              background: (device.manual_control || eff?.isManual) ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.2)',
+                              color: (device.manual_control || eff?.isManual) ? '#22c55e' : '#f59e0b',
+                              border: `1px solid ${(device.manual_control || eff?.isManual) ? '#16a34a' : '#d97706'}`,
                               borderRadius: '6px',
                               padding: '4px 10px',
                               fontSize: '0.75rem',
@@ -4007,7 +4008,7 @@ const App = () => {
                               gap: '4px'
                             }}
                           >
-                            <Sliders size={13} /> {(device.manual_control || eff.isManual) ? `Manual ON (${eff.water_level}cm)` : 'Set Manual (0-100cm)'}
+                            <Sliders size={13} /> {(device.manual_control || eff?.isManual) ? `Manual ON (${eff?.water_level || 0}cm)` : 'Set Manual (0-100cm)'}
                           </button>
                         )}
                       </div>

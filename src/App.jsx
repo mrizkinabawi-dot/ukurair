@@ -883,6 +883,7 @@ const ProfileChromePopup = ({
   userPhoto,
   userDisplayName,
   handlePhotoUpload,
+  handleRemovePhoto,
   isAdminUser,
   onClose,
   onManageAdmin,
@@ -990,25 +991,46 @@ const ProfileChromePopup = ({
           {user ? user.email : 'Masuk untuk sinkronisasi akun'}
         </p>
 
-        {/* Tombol Ubah Foto */}
-        <label
-          htmlFor="input-upload-avatar-chrome"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            fontSize: '0.75rem',
-            padding: '5px 12px',
-            borderRadius: '16px',
-            background: 'rgba(56, 189, 248, 0.12)',
-            color: '#38bdf8',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
-            cursor: 'pointer',
-            fontWeight: 600
-          }}
-        >
-          <Camera size={13} /> Ubah Foto Profil
-        </label>
+        {/* Tombol Ubah / Reset Foto Profil */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <label
+            htmlFor="input-upload-avatar-chrome"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.75rem',
+              padding: '5px 12px',
+              borderRadius: '16px',
+              background: 'rgba(56, 189, 248, 0.12)',
+              color: '#38bdf8',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+              cursor: 'pointer',
+              fontWeight: 600
+            }}
+          >
+            <Camera size={13} /> Ubah Foto Profil
+          </label>
+          {userPhoto && handleRemovePhoto && (
+            <button
+              type="button"
+              onClick={handleRemovePhoto}
+              style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                color: '#ef4444',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                fontSize: '0.72rem',
+                padding: '4px 10px',
+                borderRadius: '16px',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+              title="Hapus foto profil dan kembalikan ke inisial huruf bawaan"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Menu List Options */}
@@ -1135,7 +1157,21 @@ const App = () => {
   const isAdminEmail = (email) => adminEmails.includes(String(email || '').trim().toLowerCase());
 
   const [customPhoto, setCustomPhoto] = useState(() => {
-    try { return localStorage.getItem('ukurair_user_photo') || ''; } catch (e) { return ''; }
+    try {
+      const savedAuth = localStorage.getItem('ukurair_auth_user');
+      if (savedAuth) {
+        const parsed = JSON.parse(savedAuth);
+        if (parsed?.photoURL) return parsed.photoURL;
+        if (parsed?.email) {
+          const emailKey = parsed.email.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase();
+          const emailPhoto = localStorage.getItem('ukurair_user_photo_' + emailKey);
+          if (emailPhoto) return emailPhoto;
+        }
+      }
+      return localStorage.getItem('ukurair_user_photo') || '';
+    } catch (e) {
+      return '';
+    }
   });
 
   const getUserDisplayName = (u) => {
@@ -1151,7 +1187,14 @@ const App = () => {
       const saved = localStorage.getItem('ukurair_auth_user');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.email) return parsed;
+        if (parsed && parsed.email) {
+          if (!parsed.photoURL) {
+            const emailKey = parsed.email.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase();
+            const fallbackPhoto = localStorage.getItem('ukurair_user_photo_' + emailKey) || localStorage.getItem('ukurair_user_photo') || null;
+            if (fallbackPhoto) parsed.photoURL = fallbackPhoto;
+          }
+          return parsed;
+        }
       }
     } catch (e) {
       console.warn('Gagal membaca sesi login:', e);
@@ -1380,28 +1423,147 @@ const App = () => {
     };
   }, []);
 
-  const handlePhotoUpload = (e) => {
+  // Kompresi gambar avatar/wallpaper menggunakan canvas HTML5 agar ringan (~15-30 KB)
+  // dan tidak pernah melebihi kuota 5MB localStorage saat refresh atau reload halaman
+  const compressAvatarImage = (file, maxDimension = 320, quality = 0.85) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onerror = () => resolve(null);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = () => resolve(e.target.result);
+        img.onload = () => {
+          try {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxDimension) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              }
+            } else {
+              if (height > maxDimension) {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve(compressedDataUrl);
+          } catch (err) {
+            console.warn('Canvas compress fallback:', err);
+            resolve(e.target.result);
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       alert('Silakan pilih file gambar (JPG, PNG, atau WEBP).');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target.result;
+
+    try {
+      const dataUrl = await compressAvatarImage(file, 320, 0.85);
+      if (!dataUrl) {
+        alert('Gagal memproses gambar. Silakan coba file gambar lain.');
+        return;
+      }
+
       setCustomPhoto(dataUrl);
-      localStorage.setItem('ukurair_user_photo', dataUrl);
+
+      // Simpan ke localStorage dengan pengamanan try-catch
+      try {
+        localStorage.setItem('ukurair_user_photo', dataUrl);
+      } catch (err) {
+        console.warn('Gagal simpan ukurair_user_photo ke localStorage:', err);
+      }
+
+      const activeEmail = user?.email || 'mrizkinabawi@gmail.com';
+      const emailKey = activeEmail.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase();
+
+      try {
+        localStorage.setItem('ukurair_user_photo_' + emailKey, dataUrl);
+      } catch (err) {}
+
       if (user) {
-        setUser(prev => ({ ...prev, photoURL: dataUrl }));
+        setUser(prev => (prev ? { ...prev, photoURL: dataUrl } : prev));
         setSavedAccounts(prev => {
           const updated = prev.map(a => a.email === user.email ? { ...a, photoURL: dataUrl } : a);
-          localStorage.setItem('savedAccounts', JSON.stringify(updated));
+          try { localStorage.setItem('savedAccounts', JSON.stringify(updated)); } catch (e) {}
           return updated;
         });
+
+        try {
+          const userObj = {
+            email: user.email,
+            uid: user.uid || ('user-' + user.email),
+            displayName: user.displayName || getUserDisplayName(user),
+            photoURL: dataUrl,
+            role: user.role || (isAdminEmail(user.email) ? 'admin' : 'user')
+          };
+          localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj));
+        } catch (err) {}
       }
-    };
-    reader.readAsDataURL(file);
+
+      // Simpan ke Firebase Realtime Database agar tersimpan permanen di cloud (sinkron antar HP & Laptop)
+      try {
+        await set(ref(db, `users/${emailKey}/photoURL`), dataUrl);
+      } catch (fbErr) {
+        console.warn('Firebase photo sync error:', fbErr);
+      }
+    } catch (err) {
+      console.error('Error in handlePhotoUpload:', err);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!confirm('Hapus foto profil dan kembalikan ke avatar bawaan inisial huruf?')) return;
+    setCustomPhoto('');
+    try {
+      localStorage.removeItem('ukurair_user_photo');
+      const activeEmail = user?.email || 'mrizkinabawi@gmail.com';
+      const emailKey = activeEmail.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase();
+      localStorage.removeItem('ukurair_user_photo_' + emailKey);
+    } catch (e) {}
+
+    if (user) {
+      setUser(prev => (prev ? { ...prev, photoURL: null } : prev));
+      setSavedAccounts(prev => {
+        const updated = prev.map(a => a.email === user.email ? { ...a, photoURL: null } : a);
+        try { localStorage.setItem('savedAccounts', JSON.stringify(updated)); } catch (e) {}
+        return updated;
+      });
+      try {
+        const userObj = {
+          email: user.email,
+          uid: user.uid || ('user-' + user.email),
+          displayName: user.displayName || getUserDisplayName(user),
+          photoURL: null,
+          role: user.role || (isAdminEmail(user.email) ? 'admin' : 'user')
+        };
+        localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj));
+      } catch (err) {}
+    }
+
+    try {
+      const activeEmail = user?.email || 'mrizkinabawi@gmail.com';
+      const emailKey = activeEmail.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase();
+      await remove(ref(db, `users/${emailKey}/photoURL`));
+    } catch (e) {}
   };
 
   // Real-time Watchdog Timer (Memeriksa detak jantung ESP32 setiap 2 detik)
@@ -1894,11 +2056,27 @@ const App = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       if (u) {
+        const emailKey = u.email ? u.email.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase() : '';
+        const savedPhoto = (() => {
+          try {
+            return (emailKey && localStorage.getItem('ukurair_user_photo_' + emailKey)) ||
+              localStorage.getItem('ukurair_user_photo') ||
+              null;
+          } catch (e) {
+            return null;
+          }
+        })();
+
+        const resolvedPhoto = u.photoURL || savedPhoto || customPhoto || null;
+        if (resolvedPhoto && !customPhoto) {
+          setCustomPhoto(resolvedPhoto);
+        }
+
         const userObj = {
           email: u.email,
           uid: u.uid,
           displayName: u.displayName || u.email.split('@')[0],
-          photoURL: u.photoURL,
+          photoURL: resolvedPhoto,
           role: adminEmails.includes(u.email.toLowerCase()) ? 'admin' : 'user'
         };
         setUser(userObj);
@@ -1922,7 +2100,31 @@ const App = () => {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [adminEmails]);
+
+  // Sinkronisasi Foto Profil / Avatar dari Firebase Realtime Database Cloud
+  useEffect(() => {
+    const activeEmail = user?.email || (isAdminUser ? 'mrizkinabawi@gmail.com' : null);
+    if (!activeEmail) return;
+    const emailKey = activeEmail.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase();
+    const photoRef = ref(db, `users/${emailKey}/photoURL`);
+    const unsub = onValue(photoRef, (snapshot) => {
+      const cloudPhoto = snapshot.val();
+      if (cloudPhoto && typeof cloudPhoto === 'string' && cloudPhoto.startsWith('data:image/')) {
+        setCustomPhoto(cloudPhoto);
+        try {
+          localStorage.setItem('ukurair_user_photo', cloudPhoto);
+          localStorage.setItem('ukurair_user_photo_' + emailKey, cloudPhoto);
+        } catch (e) {}
+        setUser(prev => {
+          if (!prev) return prev;
+          if (prev.photoURL === cloudPhoto) return prev;
+          return { ...prev, photoURL: cloudPhoto };
+        });
+      }
+    }, () => {});
+    return () => unsub();
+  }, [user?.email, isAdminUser]);
 
   // Daftar email admin tambahan dari /settings/admin_emails
   // Format yang didukung: "a@x.com, b@y.com" atau { "a@x.com": true }
@@ -2308,13 +2510,24 @@ const App = () => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, loginEmail, loginPass);
       const fbUser = userCredential.user;
+      const emailKey = fbUser.email ? fbUser.email.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase() : '';
+      const existingPhoto = (() => {
+        try {
+          return (emailKey && localStorage.getItem('ukurair_user_photo_' + emailKey)) ||
+            localStorage.getItem('ukurair_user_photo') ||
+            customPhoto || null;
+        } catch (e) {
+          return customPhoto || null;
+        }
+      })();
       const userObj = {
         email: fbUser.email,
         uid: fbUser.uid,
         displayName: fbUser.displayName || fbUser.email.split('@')[0],
-        photoURL: fbUser.photoURL,
+        photoURL: fbUser.photoURL || existingPhoto || null,
         role: isAdminEmail(fbUser.email) ? 'admin' : 'user'
       };
+      if (existingPhoto && !customPhoto) setCustomPhoto(existingPhoto);
       setUser(userObj);
       try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (err) {}
 
@@ -2360,17 +2573,28 @@ const App = () => {
 
     // 3. Bypass login darurat admin (jika Firebase Auth offline atau domain belum whitelist)
     if (emailNorm === 'mrizkinabawi@gmail.com' && (loginPass === 'admin123' || loginPass.length >= 6)) {
+      const emailKey = 'mrizkinabawi@gmail.com'.replace(/[\.\#\$\[\]\/\s]/g, '_').toLowerCase();
+      const existingPhoto = (() => {
+        try {
+          return localStorage.getItem('ukurair_user_photo_' + emailKey) ||
+            localStorage.getItem('ukurair_user_photo') ||
+            customPhoto || null;
+        } catch (e) {
+          return customPhoto || null;
+        }
+      })();
       const userObj = {
         email: emailNorm,
         uid: 'bypass-admin',
         displayName: 'Muhamad',
-        photoURL: null,
+        photoURL: existingPhoto || null,
         role: 'admin'
       };
+      if (existingPhoto && !customPhoto) setCustomPhoto(existingPhoto);
       setUser(userObj);
       try { localStorage.setItem('ukurair_auth_user', JSON.stringify(userObj)); } catch (err) {}
 
-      const account = { email: emailNorm, name: 'Muhamad', photoURL: null };
+      const account = { email: emailNorm, name: 'Muhamad', photoURL: existingPhoto || null };
       const newSaved = [account, ...savedAccounts.filter(a => a.email !== account.email)];
       setSavedAccounts(newSaved);
       localStorage.setItem('savedAccounts', JSON.stringify(newSaved));
@@ -4237,6 +4461,7 @@ const App = () => {
               userPhoto={userPhoto}
               userDisplayName={getUserDisplayName(user)}
               handlePhotoUpload={handlePhotoUpload}
+              handleRemovePhoto={handleRemovePhoto}
               isAdminUser={isAdminUser}
               onClose={() => setIsHeaderProfileOpen(false)}
               onManageAdmin={() => { setView('admin'); setIsHeaderProfileOpen(false); }}
@@ -4467,6 +4692,7 @@ const App = () => {
               userPhoto={userPhoto}
               userDisplayName={getUserDisplayName(user)}
               handlePhotoUpload={handlePhotoUpload}
+              handleRemovePhoto={handleRemovePhoto}
               isAdminUser={isAdminUser}
               onClose={() => setIsProfileMenuOpen(false)}
               onManageAdmin={() => { setView('admin'); setIsProfileMenuOpen(false); }}

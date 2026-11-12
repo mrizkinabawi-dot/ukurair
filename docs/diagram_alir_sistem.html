@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Diagram Alir Sistem (System Flowchart) - UkurAir</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #f1f5f9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      background: #ffffff;
+      padding: 24px 32px;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      max-width: 1280px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 12px;
+    }
+    .header h2 {
+      margin: 0;
+      color: #1e293b;
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .btn-download {
+      background: #0284c7;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-download:hover {
+      background: #0369a1;
+    }
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <h2>📊 DIAGRAM ALIR SISTEM (SYSTEM FLOWCHART) — RASIO 16:9</h2>
+      <button class="btn-download" onclick="window.print()">🖨️ Cetak / Simpan Gambar</button>
+    </div>
+
+    <!-- SVG DIAGRAM -->
+    <svg viewBox="0 0 1200 640" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <!-- Marker Panah -->
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#475569"/>
+        </marker>
+        <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#0284c7"/>
+        </marker>
+        <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#16a34a"/>
+        </marker>
+        <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#dc2626"/>
+        </marker>
+        
+        <!-- Drop Shadow Filter -->
+        <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.06"/>
+        </filter>
+      </defs>
+
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- 1. BLOK 1: CATU DAYA & POWER (ATAS - LEBAR)                     -->
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <rect x="30" y="25" width="1140" height="115" rx="8" fill="#faf5ff" stroke="#c084fc" stroke-width="1.8" stroke-dasharray="none" />
+      <text x="50" y="47" font-size="12" font-weight="700" fill="#7e22ce" letter-spacing="0.5">⚡ BLOK 1: CATU DAYA &amp; POWER SUPPLY</text>
+
+      <!-- Node 1.1: Panel Surya -->
+      <g filter="url(#shadow)">
+        <rect x="50" y="60" width="150" height="60" rx="6" fill="#ffffff" stroke="#9333ea" stroke-width="1.2"/>
+        <text x="125" y="87" font-size="12" font-weight="700" fill="#1e293b" text-anchor="middle">☀️ Panel Surya</text>
+        <text x="125" y="103" font-size="10" fill="#64748b" text-anchor="middle">50Wp Monokristalin</text>
+      </g>
+
+      <!-- Panah 1.1 -> 1.2 -->
+      <line x1="200" y1="90" x2="238" y2="90" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 1.2: SCC -->
+      <g filter="url(#shadow)">
+        <rect x="240" y="60" width="170" height="60" rx="6" fill="#ffffff" stroke="#9333ea" stroke-width="1.2"/>
+        <text x="325" y="86" font-size="12" font-weight="700" fill="#1e293b" text-anchor="middle">Solar Controller (SCC)</text>
+        <text x="325" y="102" font-size="10" fill="#64748b" text-anchor="middle">Pengendali Pengisian 12V</text>
+      </g>
+
+      <!-- Panah 1.2 -> 1.3 -->
+      <line x1="410" y1="90" x2="448" y2="90" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 1.3: Aki 12V -->
+      <g filter="url(#shadow)">
+        <rect x="450" y="60" width="150" height="60" rx="6" fill="#ffffff" stroke="#9333ea" stroke-width="1.2"/>
+        <text x="525" y="87" font-size="12" font-weight="700" fill="#1e293b" text-anchor="middle">🔋 Aki VRLA 12V</text>
+        <text x="525" y="103" font-size="10" fill="#64748b" text-anchor="middle">Penyimpan Energi</text>
+      </g>
+
+      <!-- Panah 1.3 -> 1.4 -->
+      <line x1="600" y1="90" x2="638" y2="90" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 1.4: Step-Down -->
+      <g filter="url(#shadow)">
+        <rect x="640" y="60" width="180" height="60" rx="6" fill="#ffffff" stroke="#9333ea" stroke-width="1.2"/>
+        <text x="730" y="86" font-size="12" font-weight="700" fill="#1e293b" text-anchor="middle">Konverter Step-Down</text>
+        <text x="730" y="102" font-size="10" fill="#64748b" text-anchor="middle">Penurun Tegangan 12V ➔ 5V</text>
+      </g>
+
+      <!-- Panah 1.4 -> 1.5 -->
+      <line x1="820" y1="90" x2="858" y2="90" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 1.5: ESP32 -->
+      <g filter="url(#shadow)">
+        <rect x="860" y="60" width="280" height="60" rx="6" fill="#f3e8ff" stroke="#7e22ce" stroke-width="1.5"/>
+        <text x="1000" y="86" font-size="13" font-weight="700" fill="#6b21a8" text-anchor="middle">⚡ Mikrokontroler ESP32</text>
+        <text x="1000" y="102" font-size="10.5" fill="#475569" text-anchor="middle">Power Supply 5V / 3.3V (VCC)</text>
+      </g>
+
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- 2. BLOK 2: AKUISISI DATA SENSOR (TENGAH KIRI)                     -->
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <rect x="30" y="175" width="480" height="150" rx="8" fill="#f0fdf4" stroke="#4ade80" stroke-width="1.8"/>
+      <text x="50" y="197" font-size="12" font-weight="700" fill="#15803d" letter-spacing="0.5">📡 BLOK 2: AKUISISI DATA SENSOR LAPANGAN</text>
+
+      <!-- Node 2.1: Sensor JSN-SR04T -->
+      <g filter="url(#shadow)">
+        <rect x="50" y="215" width="180" height="85" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.2"/>
+        <text x="140" y="243" font-size="11.5" font-weight="700" fill="#1e293b" text-anchor="middle">Sensor Ultrasonik</text>
+        <text x="140" y="260" font-size="11" font-weight="600" fill="#15803d" text-anchor="middle">JSN-SR04T (Waterproof)</text>
+        <text x="140" y="280" font-size="9.5" fill="#64748b" text-anchor="middle">Ukur Jarak Pantulan Air</text>
+      </g>
+
+      <!-- Panah 2.1 -> 2.2 -->
+      <line x1="230" y1="257" x2="278" y2="257" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 2.2: Perhitungan Level Air -->
+      <g filter="url(#shadow)">
+        <rect x="280" y="215" width="210" height="85" rx="6" fill="#ffffff" stroke="#16a34a" stroke-width="1.2"/>
+        <text x="385" y="240" font-size="11.5" font-weight="700" fill="#1e293b" text-anchor="middle">Kalkulasi Level Air (ESP32)</text>
+        <text x="385" y="258" font-size="10" font-weight="600" fill="#0284c7" text-anchor="middle">Tinggi Air = H_tiang - Jarak</text>
+        <text x="385" y="278" font-size="9.5" fill="#64748b" text-anchor="middle">Satuan: Sentimeter (cm)</text>
+      </g>
+
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- 4. BLOK 4: CLOUD & ANTARMUKA WEB (TENGAH KANAN)                  -->
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <rect x="540" y="175" width="630" height="150" rx="8" fill="#f0f9ff" stroke="#38bdf8" stroke-width="1.8"/>
+      <text x="560" y="197" font-size="12" font-weight="700" fill="#0369a1" letter-spacing="0.5">🌐 BLOK 4: CLOUD DATABASE &amp; ANTARMUKA WEB UKURAIR</text>
+
+      <!-- Node 4.1: LoRa Gateway -->
+      <g filter="url(#shadow)">
+        <rect x="555" y="215" width="125" height="85" rx="6" fill="#ffffff" stroke="#0284c7" stroke-width="1.2"/>
+        <text x="617" y="247" font-size="11" font-weight="700" fill="#1e293b" text-anchor="middle">LoRa Gateway</text>
+        <text x="617" y="265" font-size="9.5" fill="#0369a1" text-anchor="middle">Penerima Radio</text>
+        <text x="617" y="281" font-size="9.5" fill="#64748b" text-anchor="middle">(Receiver)</text>
+      </g>
+
+      <!-- Panah 4.1 -> 4.2 -->
+      <line x1="680" y1="257" x2="708" y2="257" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 4.2: Firebase RTDB -->
+      <g filter="url(#shadow)">
+        <rect x="710" y="215" width="135" height="85" rx="6" fill="#ffffff" stroke="#f59e0b" stroke-width="1.2"/>
+        <text x="777" y="247" font-size="11" font-weight="700" fill="#1e293b" text-anchor="middle">Firebase RTDB</text>
+        <text x="777" y="265" font-size="9.5" fill="#d97706" text-anchor="middle">Cloud Database</text>
+        <text x="777" y="281" font-size="9.5" fill="#64748b" text-anchor="middle">Sinkronisasi Live</text>
+      </g>
+
+      <!-- Panah 4.2 -> 4.3 -->
+      <line x1="845" y1="257" x2="873" y2="257" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 4.3: Web GIS UkurAir -->
+      <g filter="url(#shadow)">
+        <rect x="875" y="215" width="140" height="85" rx="6" fill="#ffffff" stroke="#0284c7" stroke-width="1.2"/>
+        <text x="945" y="245" font-size="11" font-weight="700" fill="#1e293b" text-anchor="middle">Web GIS UkurAir</text>
+        <text x="945" y="263" font-size="9.5" fill="#0284c7" text-anchor="middle">Peta &amp; Grafik</text>
+        <text x="945" y="279" font-size="9.5" fill="#64748b" text-anchor="middle">Fluktuasi 24 Jam</text>
+      </g>
+
+      <!-- Panah 4.3 -> 4.4 -->
+      <line x1="1015" y1="257" x2="1038" y2="257" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 4.4: Scan QR Smartphone -->
+      <g filter="url(#shadow)">
+        <rect x="1040" y="215" width="115" height="85" rx="6" fill="#e0f2fe" stroke="#0284c7" stroke-width="1.4"/>
+        <text x="1097" y="245" font-size="10.5" font-weight="700" fill="#0369a1" text-anchor="middle">Scan QR Code</text>
+        <text x="1097" y="263" font-size="9.5" fill="#1e293b" text-anchor="middle">Smartphone</text>
+        <text x="1097" y="279" font-size="9.5" fill="#0284c7" text-anchor="middle">Warga &amp; Publik</text>
+      </g>
+
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- 3. BLOK 3: EVALUASI & TRANSMISI (BAWAH - LEBAR)                  -->
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <rect x="30" y="365" width="1140" height="235" rx="8" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.8"/>
+      <text x="50" y="387" font-size="12" font-weight="700" fill="#b45309" letter-spacing="0.5">⚠️ BLOK 3: EVALUASI KONDISI &amp; TRANSMISI DATA</text>
+
+      <!-- Node 3.1: Status Air Input -->
+      <g filter="url(#shadow)">
+        <rect x="50" y="445" width="130" height="70" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.2"/>
+        <text x="115" y="475" font-size="11.5" font-weight="700" fill="#1e293b" text-anchor="middle">Status Tinggi Air</text>
+        <text x="115" y="493" font-size="10" fill="#64748b" text-anchor="middle">(Nilai dalam cm)</text>
+      </g>
+
+      <!-- Panah 3.1 -> 3.2 (Belah Ketupat Decision) -->
+      <line x1="180" y1="480" x2="228" y2="480" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 3.2: Belah Ketupat Decision (Kondisi Siaga/Bahaya) -->
+      <g filter="url(#shadow)">
+        <polygon points="310,420 390,480 310,540 230,480" fill="#fef2f2" stroke="#ef4444" stroke-width="1.8"/>
+        <text x="310" y="475" font-size="11.5" font-weight="700" fill="#b91c1c" text-anchor="middle">Status Bahaya</text>
+        <text x="310" y="493" font-size="11" font-weight="700" fill="#b91c1c" text-anchor="middle">/ Siaga?</text>
+      </g>
+
+      <!-- Cabang TIDAK (Aman) - Belok ke Atas -->
+      <path d="M 390 480 L 440 480 L 440 435 L 478 435" fill="none" stroke="#16a34a" stroke-width="1.6" marker-end="url(#arrow-green)"/>
+      <rect x="400" y="460" width="36" height="16" rx="3" fill="#dcfce7"/>
+      <text x="418" y="472" font-size="9.5" font-weight="700" fill="#15803d" text-anchor="middle">TIDAK</text>
+
+      <!-- Node 3.3A: Status Aman -->
+      <g filter="url(#shadow)">
+        <rect x="480" y="405" width="180" height="60" rx="6" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.2"/>
+        <text x="570" y="432" font-size="11" font-weight="700" fill="#15803d" text-anchor="middle">✓ Status Aman / Normal</text>
+        <text x="570" y="448" font-size="9.5" fill="#475569" text-anchor="middle">Tanpa Kirim SMS</text>
+      </g>
+
+      <!-- Cabang YA (Bahaya/Siaga) - Belok ke Bawah -->
+      <path d="M 310 540 L 310 565 L 478 565" fill="none" stroke="#dc2626" stroke-width="1.6" marker-end="url(#arrow-red)"/>
+      <rect x="320" y="548" width="28" height="16" rx="3" fill="#fee2e2"/>
+      <text x="334" y="560" font-size="9.5" font-weight="700" fill="#b91c1c" text-anchor="middle">YA</text>
+
+      <!-- Node 3.3B: Modul GSM -->
+      <g filter="url(#shadow)">
+        <rect x="480" y="535" width="180" height="60" rx="6" fill="#fef2f2" stroke="#dc2626" stroke-width="1.2"/>
+        <text x="570" y="560" font-size="11" font-weight="700" fill="#b91c1c" text-anchor="middle">📱 Modul GSM (SIM800L)</text>
+        <text x="570" y="578" font-size="9.5" fill="#475569" text-anchor="middle">Kirim SMS Alert ke Warga</text>
+      </g>
+
+      <!-- Penggabungan Cabang ke LoRa Transmitter -->
+      <!-- Jalur dari 3.3A ke LoRa TX -->
+      <path d="M 660 435 L 720 435 L 720 475 L 748 475" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+      <!-- Jalur dari 3.3B ke LoRa TX -->
+      <path d="M 660 565 L 720 565 L 720 495 L 748 495" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 3.4: Pemancar LoRa (TX) -->
+      <g filter="url(#shadow)">
+        <rect x="750" y="445" width="180" height="80" rx="6" fill="#ffffff" stroke="#d97706" stroke-width="1.3"/>
+        <text x="840" y="478" font-size="11.5" font-weight="700" fill="#1e293b" text-anchor="middle">📡 Pemancar LoRa (TX)</text>
+        <text x="840" y="496" font-size="10" font-weight="600" fill="#d97706" text-anchor="middle">Modul SX1278 (433/915 MHz)</text>
+        <text x="840" y="512" font-size="9.5" fill="#64748b" text-anchor="middle">Transmisi Jarak Jauh (Long Range)</text>
+      </g>
+
+      <!-- Panah 3.4 -> 3.5 -->
+      <line x1="930" y1="485" x2="968" y2="485" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+      <!-- Node 3.5: Paket Data Radio Dikirim -->
+      <g filter="url(#shadow)">
+        <rect x="970" y="445" width="180" height="80" rx="6" fill="#fff7ed" stroke="#ea580c" stroke-width="1.4"/>
+        <text x="1060" y="478" font-size="11" font-weight="700" fill="#c2410c" text-anchor="middle">Paket Data Terkirim</text>
+        <text x="1060" y="496" font-size="9.5" fill="#1e293b" text-anchor="middle">ID Alat, Tinggi Air, Status</text>
+        <text x="1060" y="512" font-size="9.5" fill="#64748b" text-anchor="middle">Via Gelombang Radio</text>
+      </g>
+
+
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      <!-- HUBUNGAN ANTAR-BLOK MENGGUNAKAN GARIS SIKU 90 DERAJAT (ORTHOGONAL)  -->
+      <!-- ══════════════════════════════════════════════════════════════════ -->
+      
+      <!-- 1. DARI BLOK 1 (ESP32) KE BLOK 2 (JSN-SR04T) -->
+      <!-- Menghindari garis miring diagonal! Gunakan jalur siku rapi di sela-sela -->
+      <path d="M 1000 120 L 1000 155 L 140 155 L 140 210" fill="none" stroke="#7e22ce" stroke-width="2" stroke-dasharray="4,4" marker-end="url(#arrow)"/>
+      <rect x="520" y="146" width="150" height="18" rx="4" fill="#faf5ff" stroke="#c084fc" stroke-width="1"/>
+      <text x="595" y="159" font-size="9" font-weight="700" fill="#7e22ce" text-anchor="middle">Catu Daya VCC &amp; Trigger Sensor</text>
+
+      <!-- 2. DARI BLOK 2 (KALKULASI AIR) KE BLOK 3 (STATUS AIR) -->
+      <!-- Garis vertikal tegak lurus ke bawah -->
+      <path d="M 385 300 L 385 345 L 115 345 L 115 440" fill="none" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/>
+      <rect x="210" y="336" width="150" height="18" rx="4" fill="#f0fdf4" stroke="#4ade80" stroke-width="1"/>
+      <text x="285" y="349" font-size="9" font-weight="700" fill="#15803d" text-anchor="middle">Hasil Data Ketinggian Air (cm)</text>
+
+      <!-- 3. DARI BLOK 3 (PAKET DATA LORA) KE BLOK 4 (GERBANG LORA GATEWAY) -->
+      <!-- Garis siku rapi dari kanan bawah naik ke atas lalu belok kiri ke LoRa Gateway -->
+      <path d="M 1060 445 L 1060 345 L 617 345 L 617 305" fill="none" stroke="#0284c7" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrow-blue)"/>
+      <rect x="790" y="336" width="170" height="18" rx="4" fill="#f0f9ff" stroke="#38bdf8" stroke-width="1"/>
+      <text x="875" y="349" font-size="9" font-weight="700" fill="#0369a1" text-anchor="middle">Transmisi Nirkabel LoRa (Radio RF)</text>
+
+    </svg>
+  </div>
+
+</body>
+</html>
+

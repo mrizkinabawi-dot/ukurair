@@ -2113,6 +2113,201 @@ const App = () => {
     } catch (e) {}
   }, [data]);
 
+  // ─── Smartphone & Android Back Button Integration (Popstate & Smart Navigation) ──
+  // Mengintegrasikan tombol fisik/gesture kembali HP (Android/iOS swipe) dan tombol Rumah
+  // agar menutup modal, drawer samping, atau kembali ke beranda alih-alih langsung keluar dari web.
+  const lastBackPressTimeRef = useRef(0);
+  const [showExitToast, setShowExitToast] = useState(false);
+  const exitToastTimerRef = useRef(null);
+
+  // Fungsi universal kembali ke Beranda (Rumah) & reset semua overlay
+  const handleGoHome = useCallback(() => {
+    setDetailModalDevice(null);
+    setShowQrModal(false);
+    setShowNotificationModal(false);
+    setManualControlModalDevice(null);
+    setEditingRangeDevice(null);
+    setIsHeaderProfileOpen(false);
+    setIsProfileMenuOpen(false);
+    setIsMenuOpen(false);
+    setShowDashboardSuggestions(false);
+    setActiveRoute(null);
+    setSearchedDestination(null);
+    setIsNavSidebarOpen(false);
+    setSelectedDevice(null);
+    setView('dashboard');
+    // Pusatkan peta kembali ke Pulau Batam
+    setMainMapTarget({ lat: 1.1301, lng: 104.0529, zoom: 12, _ts: Date.now() });
+  }, []);
+
+  // Fungsi cerdas kembali 1 langkah (Smart Back)
+  const handleSmartBack = useCallback(() => {
+    // 1. Tutup modal-modal pop-up yang aktif
+    if (detailModalDevice) {
+      setDetailModalDevice(null);
+      return true;
+    }
+    if (showQrModal) {
+      setShowQrModal(false);
+      return true;
+    }
+    if (showNotificationModal) {
+      setShowNotificationModal(false);
+      return true;
+    }
+    if (manualControlModalDevice) {
+      setManualControlModalDevice(null);
+      return true;
+    }
+    if (editingRangeDevice) {
+      setEditingRangeDevice(null);
+      return true;
+    }
+    if (isHeaderProfileOpen) {
+      setIsHeaderProfileOpen(false);
+      return true;
+    }
+    if (isProfileMenuOpen) {
+      setIsProfileMenuOpen(false);
+      return true;
+    }
+    if (isMenuOpen) {
+      setIsMenuOpen(false);
+      return true;
+    }
+    if (showDashboardSuggestions) {
+      setShowDashboardSuggestions(false);
+      return true;
+    }
+
+    // 2. Batalkan rute jika sedang aktif
+    if (activeRoute) {
+      setActiveRoute(null);
+      setSearchedDestination(null);
+      return true;
+    }
+
+    // 3. Tutup sidebar menu samping (titik pantau) jika sedang terbuka
+    if (isNavSidebarOpen) {
+      setIsNavSidebarOpen(false);
+      return true;
+    }
+
+    // 4. Tutup detail device atau batalkan pemilihan sensor di peta
+    if (view === 'device-detail') {
+      setView('dashboard');
+      setSelectedDevice(null);
+      return true;
+    }
+    if (selectedDevice) {
+      setSelectedDevice(null);
+      return true;
+    }
+
+    // 5. Jika sedang di halaman admin atau login, kembali ke dashboard
+    if (view === 'admin' || view === 'login') {
+      setView('dashboard');
+      return true;
+    }
+
+    // Tidak ada layer yang aktif (sudah di beranda bersih)
+    return false;
+  }, [
+    detailModalDevice,
+    showQrModal,
+    showNotificationModal,
+    manualControlModalDevice,
+    editingRangeDevice,
+    isHeaderProfileOpen,
+    isProfileMenuOpen,
+    isMenuOpen,
+    showDashboardSuggestions,
+    activeRoute,
+    isNavSidebarOpen,
+    view,
+    selectedDevice
+  ]);
+
+  // Cek apakah ada layer/overlay aktif yang bisa di-back
+  const isAnyLayerActive = Boolean(
+    detailModalDevice ||
+    showQrModal ||
+    showNotificationModal ||
+    manualControlModalDevice ||
+    editingRangeDevice ||
+    isHeaderProfileOpen ||
+    isProfileMenuOpen ||
+    isMenuOpen ||
+    showDashboardSuggestions ||
+    activeRoute ||
+    isNavSidebarOpen ||
+    selectedDevice ||
+    view !== 'dashboard'
+  );
+
+  // Sinkronkan state ke browser history agar tombol kembali HP tidak langsung keluar dari web
+  const pushedLayerRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        if (!window.history.state || window.history.state?.app !== 'ukurair') {
+          window.history.replaceState({ app: 'ukurair', layer: 'root' }, '');
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (isAnyLayerActive) {
+        if (!pushedLayerRef.current) {
+          window.history.pushState({ app: 'ukurair', layer: 'overlay', ts: Date.now() }, '');
+          pushedLayerRef.current = true;
+        }
+      } else {
+        pushedLayerRef.current = false;
+      }
+    } catch (e) {}
+  }, [isAnyLayerActive]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      pushedLayerRef.current = false;
+      const didClose = handleSmartBack();
+
+      if (!didClose) {
+        // Jika sudah di beranda utama (tidak ada modal/overlay yang buka):
+        const now = Date.now();
+        if (now - lastBackPressTimeRef.current < 2000) {
+          // Pengguna menekan kembali 2x berturut-turut: izinkan keluar dari web
+          return;
+        }
+
+        // Pengguna menekan 1x: cegah keluar mendadak & beri notifikasi Android
+        lastBackPressTimeRef.current = now;
+        try {
+          window.history.pushState({ app: 'ukurair', layer: 'root' }, '');
+        } catch (e) {}
+
+        setShowExitToast(true);
+        if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+        exitToastTimerRef.current = setTimeout(() => {
+          setShowExitToast(false);
+        }, 2200);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (exitToastTimerRef.current) clearTimeout(exitToastTimerRef.current);
+    };
+  }, [handleSmartBack]);
+
   // Smooth continuous interpolated data for Detail Modal Chart (disesuaikan untuk sensor 10 menit)
   const detailChartData = useMemo(() => {
     if (!detailModalDevice || !chartData[detailModalDevice.id]) return [];
@@ -4793,29 +4988,32 @@ const App = () => {
           <div className="nav-action-pill animate-fade-in">
             <ArrowLeft
               size={18}
-              color={view === 'dashboard' ? '#475569' : '#cbd5e1'}
-              style={{ cursor: view === 'dashboard' ? 'not-allowed' : 'pointer', transition: 'color 0.2s' }}
-              onMouseOver={e => { if (view !== 'dashboard') e.currentTarget.style.color = '#fff'; }}
-              onMouseOut={e => { if (view !== 'dashboard') e.currentTarget.style.color = '#cbd5e1'; }}
-              onClick={() => { if (view !== 'dashboard') { setView('dashboard'); setSelectedDevice(null); } }}
+              color={isAnyLayerActive ? '#38bdf8' : '#475569'}
+              style={{ cursor: isAnyLayerActive ? 'pointer' : 'default', transition: 'color 0.2s' }}
+              title={isAnyLayerActive ? "Kembali ke langkah sebelumnya" : "Sudah di Beranda"}
+              onMouseOver={e => { if (isAnyLayerActive) e.currentTarget.style.color = '#fff'; }}
+              onMouseOut={e => { e.currentTarget.style.color = isAnyLayerActive ? '#38bdf8' : '#475569'; }}
+              onClick={() => { if (isAnyLayerActive) handleSmartBack(); }}
             />
             <RefreshCcw
               size={18}
               color="#cbd5e1"
               style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+              title="Segarkan / Muat Ulang Halaman"
               onMouseOver={e => e.currentTarget.style.color = '#fff'}
               onMouseOut={e => e.currentTarget.style.color = '#cbd5e1'}
               onClick={() => window.location.reload()}
             />
             <Home
               size={18}
-              color={view === 'dashboard' && !selectedDevice ? '#38bdf8' : '#cbd5e1'}
+              color={view === 'dashboard' && !isAnyLayerActive ? '#38bdf8' : '#cbd5e1'}
               style={{ cursor: 'pointer', transition: 'color 0.2s' }}
+              title="Kembali ke Beranda (Peta Utama)"
               onMouseOver={e => e.currentTarget.style.color = '#fff'}
-              onMouseOut={e => e.currentTarget.style.color = view === 'dashboard' && !selectedDevice ? '#38bdf8' : '#cbd5e1'}
-              onClick={() => { setView('dashboard'); setSelectedDevice(null); }}
+              onMouseOut={e => e.currentTarget.style.color = view === 'dashboard' && !isAnyLayerActive ? '#38bdf8' : '#cbd5e1'}
+              onClick={handleGoHome}
             />
-            <QrCode
+            <Share2
               size={18}
               color="#38bdf8"
               style={{ cursor: 'pointer', transition: 'transform 0.2s, color 0.2s' }}
@@ -8182,6 +8380,80 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
           setMainMapTarget({ lat: dev.lat, lng: dev.lng, zoom: 16, _ts: Date.now() });
         }}
       />
+
+      {/* ─── Toast Konfirmasi Keluar Android (Double-Back to Exit) ─── */}
+      {showExitToast && (
+        <div className="mobile-exit-toast animate-fade-in">
+          <span>Tekan sekali lagi untuk keluar dari UkurAir</span>
+        </div>
+      )}
+
+      {/* ─── Bilah Navigasi Bawah Khusus Smartphone / HP (Mobile Bottom Navigation) ─── */}
+      {(view === 'dashboard' || view === 'device-detail') && (
+        <nav className="mobile-bottom-nav" aria-label="Navigasi Smartphone">
+          {/* 1. Beranda (Rumah) */}
+          <button
+            type="button"
+            className={`mobile-nav-item ${view === 'dashboard' && !isAnyLayerActive ? 'active' : ''}`}
+            onClick={handleGoHome}
+            title="Beranda (Peta Utama)"
+          >
+            <Home size={20} />
+            <span>Beranda</span>
+          </button>
+
+          {/* 2. Kembali (Smart Back) */}
+          <button
+            type="button"
+            className={`mobile-nav-item ${isAnyLayerActive ? 'active has-badge' : ''}`}
+            onClick={() => {
+              if (isAnyLayerActive) {
+                handleSmartBack();
+              } else {
+                window.history.back();
+              }
+            }}
+            title="Kembali"
+          >
+            <ArrowLeft size={20} />
+            <span>Kembali</span>
+            {isAnyLayerActive && <span className="nav-indicator-dot" />}
+          </button>
+
+          {/* 3. Titik Pantau (Menu Samping) */}
+          <button
+            type="button"
+            className={`mobile-nav-item ${isNavSidebarOpen ? 'active' : ''}`}
+            onClick={() => setIsNavSidebarOpen(prev => !prev)}
+            title="Buka Titik Pantau"
+          >
+            <Menu size={20} />
+            <span>Titik Pantau</span>
+          </button>
+
+          {/* 4. Segarkan (Balik-balik / Refresh) */}
+          <button
+            type="button"
+            className="mobile-nav-item"
+            onClick={() => window.location.reload()}
+            title="Segarkan Halaman"
+          >
+            <RefreshCcw size={19} />
+            <span>Segarkan</span>
+          </button>
+
+          {/* 5. Bagikan (QR Code) */}
+          <button
+            type="button"
+            className={`mobile-nav-item ${showQrModal ? 'active' : ''}`}
+            onClick={() => setShowQrModal(true)}
+            title="Bagikan Web via Kode QR"
+          >
+            <Share2 size={20} />
+            <span>Bagikan</span>
+          </button>
+        </nav>
+      )}
     </div>
   );
 };

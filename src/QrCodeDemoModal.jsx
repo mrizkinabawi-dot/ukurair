@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  QrCode, X, ExternalLink, Copy, Check, Download, Smartphone, Sparkles, Radio, Layers, ShieldCheck
+  QrCode, X, ExternalLink, Copy, Check, Download, Smartphone, Sparkles, Radio, Share2, HelpCircle, Clock
 } from 'lucide-react';
 
 export const QrCodeDemoModal = ({
@@ -113,14 +113,14 @@ export const QrCodeDemoModal = ({
               color: '#38bdf8',
               border: '1px solid rgba(56, 189, 248, 0.3)'
             }}>
-              <QrCode size={22} />
+              <Share2 size={20} />
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: '#f8fafc' }}>
-                Demonstrasi Kode QR (Scan di HP)
+                Bagikan Website (Kode QR)
               </h3>
               <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8' }}>
-                Akses instan smartphone dosen tanpa perlu mengetik URL
+                Pindai kode QR untuk membuka website secara instan di smartphone
               </p>
             </div>
           </div>
@@ -171,7 +171,7 @@ export const QrCodeDemoModal = ({
               transition: 'all 0.15s'
             }}
           >
-            <Smartphone size={15} /> 1. Buka di HP Dosen
+            <Smartphone size={15} /> 1. Bagikan Web
           </button>
 
           <button
@@ -189,12 +189,15 @@ export const QrCodeDemoModal = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '4px',
               borderRadius: '6px 6px 0 0',
               transition: 'all 0.15s'
             }}
           >
-            <Radio size={15} /> 2. Stiker Casing Lapangan
+            <Radio size={15} /> 2. Stiker Lokasi
+            <span style={{ fontSize: '0.62rem', background: 'rgba(234, 179, 8, 0.2)', color: '#facc15', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+              Soon
+            </span>
           </button>
 
           <button
@@ -217,7 +220,7 @@ export const QrCodeDemoModal = ({
               transition: 'all 0.15s'
             }}
           >
-            <Sparkles size={15} /> 3. Skenario Sidang
+            <HelpCircle size={15} /> 3. Panduan Penggunaan
           </button>
         </div>
 
@@ -226,7 +229,7 @@ export const QrCodeDemoModal = ({
           {activeTab === 'web' && (
             <div style={{ textAlign: 'center' }}>
               <p style={{ margin: '0 0 16px 0', fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.5 }}>
-                Arahkan <b>kamera HP Dosen / Penguji</b> ke kode QR berikut untuk langsung membuka dashboard pemantau banjir di smartphone secara <i>live</i>:
+                Arahkan <b>kamera smartphone</b> ke kode QR berikut untuk langsung membuka website pemantau banjir tanpa perlu mengetik alamat tautan:
               </p>
 
               {/* Box Frame QR Code */}
@@ -281,27 +284,43 @@ export const QrCodeDemoModal = ({
                 </div>
               </div>
 
-              {/* Tombol Unduh QR untuk PPT */}
+              {/* Tombol Unduh QR */}
               <button
                 onClick={handleDownloadQr}
                 className="btn btn-primary"
                 style={{ width: '100%', fontSize: '0.85rem', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '8px' }}
               >
-                <Download size={16} /> Unduh Gambar QR Code (Untuk Slide PPT Sidang)
+                <Download size={16} /> Unduh Gambar Kode QR
               </button>
             </div>
           )}
 
           {activeTab === 'device' && (
             <div>
-              <p style={{ margin: '0 0 12px 0', fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.5 }}>
-                Simulasi stiker akrilik / barcode fisik yang ditempel pada <b>tiang sensor di sungai / drainase</b>. Warga atau dosen yang scan QR ini akan langsung diarahkan ke titik sensor tersebut:
-              </p>
+              {/* Badge Coming Soon */}
+              <div style={{
+                textAlign: 'center',
+                background: 'rgba(234, 179, 8, 0.08)',
+                border: '1px solid rgba(234, 179, 8, 0.25)',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(234, 179, 8, 0.2)', color: '#facc15', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700, marginBottom: '8px' }}>
+                  <Clock size={14} /> Fitur Segera Hadir (Coming Soon)
+                </div>
+                <h4 style={{ margin: '0 0 6px 0', fontSize: '0.95rem', color: '#f8fafc' }}>
+                  Integrasi Kode QR Stiker Fisik Tiang Sensor
+                </h4>
+                <p style={{ margin: 0, fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+                  Fitur ini dirancang untuk mencetak stiker akrilik / barcode fisik pada tiang sensor di sungai atau jalan. Masyarakat di lokasi dapat memindai stiker untuk langsung membuka status titik pantau tersebut.
+                </p>
+              </div>
 
-              {/* Pilihan Perangkat */}
-              <div style={{ marginBottom: '14px' }}>
+              {/* Pilihan Perangkat Preview */}
+              <div style={{ marginBottom: '14px', opacity: 0.85 }}>
                 <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '4px' }}>
-                  Pilih Titik Sensor Lapangan:
+                  Pratinjau Titik Sensor:
                 </label>
                 <select
                   value={selectedDeviceId}
@@ -326,18 +345,19 @@ export const QrCodeDemoModal = ({
 
               {/* Mockup Stiker Fisik IoT Casing */}
               <div style={{
-                border: '2px dashed #0284c7',
+                border: '2px dashed rgba(56, 189, 248, 0.4)',
                 borderRadius: '12px',
                 padding: '16px',
                 background: '#0b1120',
                 textAlign: 'center',
-                marginBottom: '16px'
+                marginBottom: '16px',
+                position: 'relative'
               }}>
                 <div style={{ fontSize: '0.72rem', letterSpacing: '0.1em', fontWeight: 800, color: '#38bdf8', marginBottom: '2px' }}>
                   SISTEM DETEKSI DINI BANJIR
                 </div>
                 <div style={{ fontSize: '0.68rem', color: '#94a3b8', marginBottom: '10px' }}>
-                  SCAN KODE QR DI BAWAH INI UNTUK CEK KETINGGIAN AIR TITIK INI
+                  PINDAI KODE QR UNTUK CEK KETINGGIAN AIR TITIK INI
                 </div>
 
                 <div style={{
@@ -351,7 +371,7 @@ export const QrCodeDemoModal = ({
                   <img
                     src={currentQrUrl}
                     alt="Stiker QR Titik Sensor"
-                    style={{ width: '170px', height: '170px', display: 'block', borderRadius: '6px' }}
+                    style={{ width: '150px', height: '150px', display: 'block', borderRadius: '6px' }}
                   />
                 </div>
 
@@ -369,7 +389,7 @@ export const QrCodeDemoModal = ({
                   className="btn btn-primary"
                   style={{ flex: 1, fontSize: '0.8rem', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                 >
-                  <Download size={14} /> Unduh Stiker QR
+                  <Download size={14} /> Unduh Pratinjau Stiker
                 </button>
                 <button
                   onClick={handleCopyLink}
@@ -384,29 +404,29 @@ export const QrCodeDemoModal = ({
 
           {activeTab === 'guide' && (
             <div style={{ fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.6 }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#38bdf8', fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Sparkles size={16} /> 3 Langkah Demonstrasi Sidang di Depan Dosen:
+              <h4 style={{ margin: '0 0 12px 0', color: '#38bdf8', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <HelpCircle size={17} /> Cara Menggunakan Fitur Berbagi via Kode QR:
               </h4>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ background: '#0f172a', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid #38bdf8' }}>
-                  <b style={{ color: '#f8fafc', display: 'block', marginBottom: '2px' }}>Langkah 1: Tampilkan QR Code di Slide PPT / Layar Laptop</b>
-                  Unduh gambar QR code dari Tab 1, lalu tempel di slide presentasi PowerPoint Anda pada slide <i>"Live Demo Sistem"</i>.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ background: '#0f172a', padding: '12px 14px', borderRadius: '10px', borderLeft: '3px solid #38bdf8' }}>
+                  <b style={{ color: '#f8fafc', display: 'block', marginBottom: '3px' }}>1. Buka Kamera di Smartphone</b>
+                  Buka aplikasi kamera bawaan pada HP Android atau iPhone Anda (tidak membutuhkan instalasi aplikasi pemindai tambahan).
                 </div>
 
-                <div style={{ background: '#0f172a', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid #10b981' }}>
-                  <b style={{ color: '#f8fafc', display: 'block', marginBottom: '2px' }}>Langkah 2: Kalimat Ajak Dosen Scan Kamera HP</b>
-                  Katakan: <i>"Bapak/Ibu Penguji, sistem UkurAir ini responsif di smartphone. Bapak/Ibu bisa membuka kamera HP dan scan QR Code di layar untuk langsung mencoba aplikasi pemantau banjir ini."</i>
+                <div style={{ background: '#0f172a', padding: '12px 14px', borderRadius: '10px', borderLeft: '3px solid #10b981' }}>
+                  <b style={{ color: '#f8fafc', display: 'block', marginBottom: '3px' }}>2. Arahkan Lensa Kamera ke Kode QR</b>
+                  Arahkan kamera HP ke gambar kode QR di layar laptop, proyektor, atau stiker pemantauan hingga muncul notifikasi tautan website.
                 </div>
 
-                <div style={{ background: '#0f172a', padding: '10px 12px', borderRadius: '8px', borderLeft: '3px solid #facc15' }}>
-                  <b style={{ color: '#f8fafc', display: 'block', marginBottom: '2px' }}>Langkah 3: Tunjukkan Sinkronisasi Real-Time</b>
-                  Saat dosen melihat web di HP mereka, Anda di laptop menggeser tombol <b>"Set Manual"</b> ketinggian air (misal dari 20 cm ke 80 cm). Tunjukkan ke dosen: <i>"Bisa dilihat di layar HP Bapak/Ibu, data ketinggian air langsung berubah seketika tanpa perlu refresh!"</i>
+                <div style={{ background: '#0f172a', padding: '12px 14px', borderRadius: '10px', borderLeft: '3px solid #facc15' }}>
+                  <b style={{ color: '#f8fafc', display: 'block', marginBottom: '3px' }}>3. Buka &amp; Pantau Informasi Banjir Real-Time</b>
+                  Ketuk notifikasi tautan yang muncul untuk langsung membuka peta pemantauan banjir, grafik ketinggian air, dan peringatan dini secara interaktif.
                 </div>
               </div>
 
-              <div style={{ marginTop: '14px', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '10px 12px', borderRadius: '8px', fontSize: '0.76rem', color: '#94a3b8' }}>
-                💡 <b>Catatan Sidang:</b> Dengan adanya QR Code ini, dosen tidak perlu repot mengetik alamat URL yang panjang di HP mereka, dan membuktikan kesiapan sistem IoT Anda untuk diimplementasikan langsung kepada masyarakat umum di lapangan.
+              <div style={{ marginTop: '14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', padding: '12px 14px', borderRadius: '10px', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+                💡 <b>Keunggulan Fitur:</b> Mempermudah pengguna dan masyarakat mengakses sistem pemantau banjir secara cepat tanpa perlu mengetik alamat URL yang panjang atau mengunduh aplikasi tambahan.
               </div>
             </div>
           )}
@@ -432,4 +452,3 @@ export const QrCodeDemoModal = ({
     </div>
   );
 };
-

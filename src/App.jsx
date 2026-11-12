@@ -1097,8 +1097,8 @@ const ProfileChromePopup = ({
               onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
             >
-              <QrCode size={18} color="#facc15" />
-              <span>Kode QR Demo (Buka di HP)</span>
+              <Share2 size={18} color="#38bdf8" />
+              <span>Bagikan Web (Kode QR)</span>
             </div>
 
             <div
@@ -1162,8 +1162,8 @@ const ProfileChromePopup = ({
               onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
               onMouseOut={e => e.currentTarget.style.background = 'transparent'}
             >
-              <QrCode size={18} color="#facc15" />
-              <span>Kode QR Demo (Buka di HP)</span>
+              <Share2 size={18} color="#38bdf8" />
+              <span>Bagikan Web (Kode QR)</span>
             </div>
             <button
               onClick={onLogin}
@@ -4396,7 +4396,7 @@ const App = () => {
                               e.stopPropagation();
                               setManualControlModalDevice(device);
                             }}
-                            title="Set Ketinggian Air Manual (0 - 100 cm) untuk Demo Presentasi Dosen (Khusus Admin)"
+                            title="Set Ketinggian Air Manual (0 - 100 cm) untuk Uji Coba & Simulasi Sensor (Khusus Admin)"
                             style={{
                               background: (device.manual_control || eff?.isManual) ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.2)',
                               color: (device.manual_control || eff?.isManual) ? '#22c55e' : '#f59e0b',
@@ -4545,7 +4545,7 @@ const App = () => {
         />
       )}
 
-      {/* ─── Modal: Kontrol Ketinggian Air Manual (Khusus Admin / Demo Dosen) ─── */}
+      {/* ─── Modal: Kontrol Ketinggian Air Manual (Khusus Admin / Uji Sensor) ─── */}
       {manualControlModalDevice && isAdminUser && (
         <ManualWaterLevelModal
           device={manualControlModalDevice}
@@ -4573,9 +4573,9 @@ const App = () => {
             onClick={() => setShowQrModal(true)}
             className="btn btn-header-nav"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-            title="Scan QR Code untuk demonstrasi di HP Dosen / Penguji"
+            title="Bagikan website melalui Kode QR"
           >
-            <QrCode size={14} color="#38bdf8" /> QR Code Demo
+            <Share2 size={14} color="#38bdf8" /> Bagikan Web
           </button>
           {user ? (
             isAdminUser ? (
@@ -4819,7 +4819,7 @@ const App = () => {
               size={18}
               color="#38bdf8"
               style={{ cursor: 'pointer', transition: 'transform 0.2s, color 0.2s' }}
-              title="Buka QR Code untuk demonstrasi di HP Dosen / Penguji"
+              title="Bagikan website melalui Kode QR"
               onMouseOver={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.transform = 'scale(1.15)'; }}
               onMouseOut={e => { e.currentTarget.style.color = '#38bdf8'; e.currentTarget.style.transform = 'scale(1)'; }}
               onClick={() => setShowQrModal(true)}
@@ -5292,7 +5292,7 @@ const App = () => {
                           e.currentTarget.style.background = isMan ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.2)';
                           e.currentTarget.style.color = isMan ? '#22c55e' : '#f59e0b';
                         }}
-                        title="Set Ketinggian Air Manual 0 - 100 cm untuk Presentasi Dosen (Khusus Admin)"
+                        title="Set Ketinggian Air Manual 0 - 100 cm untuk Simulasi Sensor (Khusus Admin)"
                       >
                         <Sliders size={14} /> {(selectedDevice.manual_control || data.find(d => d.id === selectedDevice.id)?.manual_control) ? `Manual ON (${getDeviceEffectiveData(data.find(d => d.id === selectedDevice.id) || selectedDevice).water_level}cm)` : 'Set Manual (0-100cm)'}
                       </button>
@@ -5327,7 +5327,7 @@ const App = () => {
                   })()}
                 </div>
 
-                {/* Widget Kontrol Manual Sensor Khusus Admin (Mode Presentasi Dosen) */}
+                {/* Widget Kontrol Manual Sensor Khusus Admin (Mode Uji Sensor) */}
                 {isAdminUser && (
                   <DeviceDetailManualControlWidget
                     device={data.find(d => d.id === selectedDevice.id) || selectedDevice}
@@ -6717,7 +6717,7 @@ const App = () => {
                                 <td style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                                   <button
                                     className="btn"
-                                    title="Atur Ketinggian Air Manual (0 - 100 cm) untuk Demo Presentasi Dosen"
+                                    title="Atur Ketinggian Air Manual (0 - 100 cm) untuk Uji Coba & Simulasi Sensor"
                                     style={{
                                       border: `1px solid ${d.manual_control ? '#16a34a' : '#d97706'}`,
                                       color: d.manual_control ? '#22c55e' : '#f59e0b',
@@ -8171,7 +8171,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
         </div>
       )}
 
-      {/* Modal Demonstrasi Kode QR (Untuk Buka di HP Dosen / Presentasi Sidang) */}
+      {/* Modal Bagikan via Kode QR (Share QR) */}
       <QrCodeDemoModal
         isOpen={showQrModal}
         onClose={() => setShowQrModal(false)}

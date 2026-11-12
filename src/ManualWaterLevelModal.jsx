@@ -164,7 +164,7 @@ export const ManualWaterLevelModal = ({
                 </span>
               </div>
               <p style={{ margin: 0, fontSize: '0.72rem', color: '#94a3b8' }}>
-                Mode Presentasi Dosen & Uji Akusisi Sensor (0 - 100 cm)
+                Mode Uji Coba &amp; Kalibrasi Sensor Manual (0 - 100 cm)
               </p>
             </div>
           </div>
@@ -255,7 +255,7 @@ export const ManualWaterLevelModal = ({
                 </div>
                 <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '2px', lineHeight: 1.3 }}>
                   {isManualOn
-                    ? 'Sensor dipaksa Online (0 - 100 cm). Panel anggota & dosen melihat data berubah live.'
+                    ? 'Sensor dipaksa Online (0 - 100 cm). Panel monitoring & dashboard publik melihat data berubah secara live.'
                     : 'Kembali ke mode hardware asli. Jika alat mati, status otomatis Terputus (OFF) & 0 cm.'}
                 </div>
               </div>
@@ -425,7 +425,7 @@ export const ManualWaterLevelModal = ({
               {/* Preset Tombol Cepat Skenario Banjir */}
               <div>
                 <label style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, display: 'block', marginBottom: '6px', textTransform: 'uppercase' }}>
-                  🎯 Tombol Skenario Cepat Presentasi Dosen:
+                  🎯 Tombol Skenario Cepat Level Air:
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '6px' }}>
                   {presets.map(p => {
@@ -537,9 +537,9 @@ export const ManualWaterLevelModal = ({
             color: '#94a3b8',
             lineHeight: 1.4
           }}>
-            <strong style={{ color: '#38bdf8' }}>💡 Panduan Presentasi Dosen:</strong>
+            <strong style={{ color: '#38bdf8' }}>💡 Informasi Sinkronisasi Real-Time:</strong>
             <br />
-            Data tersinkronisasi langsung ke node Firebase RTDB (<code>/dashboard</code> & <code>/measurements</code>). Panel anggota, mahasiswa, atau dosen yang membuka web di browser lain akan langsung melihat indikator angka, grafik, dan lingkaran banjir di peta berubah secara otomatis.
+            Data tersinkronisasi langsung ke node Firebase RTDB (<code>/dashboard</code> &amp; <code>/measurements</code>). Panel anggota, dashboard publik, atau smartphone yang membuka web akan langsung melihat indikator angka, grafik, dan lingkaran banjir di peta berubah secara otomatis.
           </div>
         </div>
 

@@ -409,7 +409,7 @@ export const SimulationControlPanel = ({
                 gap: '6px',
                 transition: 'all 0.15s ease'
               }}
-              title="Set Ketinggian Air Manual (0 - 100 cm) langsung ke Firebase RTDB untuk Demo Dosen"
+              title="Set Ketinggian Air Manual (0 - 100 cm) langsung ke Firebase RTDB untuk Uji Coba Sensor"
             >
               <Sliders size={13} /> 🎛️ Kontrol Ketinggian Manual (0-100cm)
             </button>

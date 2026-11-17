@@ -8079,7 +8079,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
               {/* Baris 1: Judul & Tombol Tutup X */}
               <div className="modal-detail-top-row">
                 <div className="modal-detail-title-wrap">
-                  <BarChart3 size={20} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <BarChart3 size={18} color="#38bdf8" className="modal-detail-title-icon" style={{ flexShrink: 0, marginTop: '2px' }} />
                   <h3 className="modal-detail-title">
                     Detail Grafik: {detailModalDevice.name}
                   </h3>
@@ -8090,7 +8090,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                   onClick={() => setDetailModalDevice(null)}
                   title="Tutup Grafik (Kembali)"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               </div>
 
@@ -8101,6 +8101,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                   const modalRate = calculateWaterRiseRate(chartData[detailModalDevice.id] || [], null, modalDev?.water_level);
                   return (
                     <span
+                      className="modal-detail-badge modal-detail-badge-rate"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -8130,12 +8131,12 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                   return (
                     <>
                       {devIp && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.73rem', fontFamily: 'monospace' }} title="IP Address ESP32 (Hanya Admin)">
+                        <span className="modal-detail-badge modal-detail-badge-net" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.73rem', fontFamily: 'monospace' }} title="IP Address ESP32 (Hanya Admin)">
                           <Wifi size={12} /> {devIp}
                         </span>
                       )}
                       {devMac && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(167, 139, 250, 0.12)', color: '#a78bfa', border: '1px solid rgba(167, 139, 250, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.73rem', fontFamily: 'monospace' }} title="MAC Address ESP32 (Hanya Admin)">
+                        <span className="modal-detail-badge modal-detail-badge-net" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(167, 139, 250, 0.12)', color: '#a78bfa', border: '1px solid rgba(167, 139, 250, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.73rem', fontFamily: 'monospace' }} title="MAC Address ESP32 (Hanya Admin)">
                           <Cpu size={12} /> {devMac}
                         </span>
                       )}
@@ -8152,6 +8153,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                   return (
                     <>
                       <span
+                        className="modal-detail-badge modal-detail-badge-weather"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -8169,6 +8171,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                       </span>
 
                       <span
+                        className="modal-detail-badge modal-detail-badge-ai"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -8192,20 +8195,20 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
 
               {/* Baris 3: Indikator Ambang Batas Siaga 1 - 4 */}
               <div className="modal-detail-legend-row">
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981', flexShrink: 0 }} /> Aman (&lt; 10 cm)
+                <span className="modal-detail-legend-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981' }}>
+                  <span className="modal-detail-legend-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981', flexShrink: 0 }} /> Aman (&lt; 10 cm)
                 </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#38bdf8' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 6px #38bdf8', flexShrink: 0 }} /> Siaga 1 (10 - 24 cm)
+                <span className="modal-detail-legend-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#38bdf8' }}>
+                  <span className="modal-detail-legend-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 6px #38bdf8', flexShrink: 0 }} /> Siaga 1 (10 - 24 cm)
                 </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f59e0b' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b', flexShrink: 0 }} /> Siaga 2 (25 - 49 cm)
+                <span className="modal-detail-legend-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f59e0b' }}>
+                  <span className="modal-detail-legend-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b', flexShrink: 0 }} /> Siaga 2 (25 - 49 cm)
                 </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f97316' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', boxShadow: '0 0 6px #f97316', flexShrink: 0 }} /> Siaga 3 (50 - 74 cm)
+                <span className="modal-detail-legend-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f97316' }}>
+                  <span className="modal-detail-legend-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', boxShadow: '0 0 6px #f97316', flexShrink: 0 }} /> Siaga 3 (50 - 74 cm)
                 </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', flexShrink: 0 }} /> Siaga 4 (75 - 100 cm)
+                <span className="modal-detail-legend-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444' }}>
+                  <span className="modal-detail-legend-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', flexShrink: 0 }} /> Siaga 4 (75 - 100 cm)
                 </span>
               </div>
 
@@ -8213,7 +8216,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
               <div className="modal-detail-controls-row">
                 {/* Filter Tanggal & Waktu */}
                 <div className="modal-detail-date-filter">
-                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginRight: '4px' }}>Filter:</span>
+                  <span className="modal-detail-filter-label" style={{ fontSize: '0.78rem', color: '#94a3b8', marginRight: '4px' }}>Filter:</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -8229,6 +8232,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                   </button>
                   <input
                     type="date"
+                    className="modal-detail-date-input"
                     value={chartDateFilter}
                     onChange={e => setChartDateFilter(e.target.value)}
                     style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', fontSize: '0.82rem' }}
@@ -8248,6 +8252,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                   </button>
                   <input
                     type="time"
+                    className="modal-detail-time-input"
                     value={chartTimeFilter}
                     onChange={e => setChartTimeFilter(e.target.value)}
                     style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', fontSize: '0.82rem', borderLeft: '1px solid #475569', paddingLeft: '8px' }}
@@ -8257,9 +8262,10 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                 {/* Pengatur Rasio Skala Jam (Zoom) & Ekspor Excel */}
                 <div className="modal-detail-action-buttons">
                   <div className="modal-detail-zoom-pill">
-                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '0 4px', fontWeight: 600 }}>Rasio:</span>
+                    <span className="modal-detail-zoom-label" style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '0 4px', fontWeight: 600 }}>Rasio:</span>
                     <button
                       type="button"
+                      className="modal-detail-zoom-btn"
                       onClick={() => setChartZoomMode('fit')}
                       title="Pas 1 Layar Penuh (00:00 - 24:00 langsung terlihat tanpa scroll)"
                       style={{
@@ -8278,6 +8284,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                     </button>
                     <button
                       type="button"
+                      className="modal-detail-zoom-btn"
                       onClick={() => setChartZoomMode('compact')}
                       title="Rasio 10 Menit per Titik (Nyaman discroll)"
                       style={{
@@ -8296,6 +8303,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                     </button>
                     <button
                       type="button"
+                      className="modal-detail-zoom-btn"
                       onClick={() => setChartZoomMode('wide')}
                       title="Mode Lebar Renggang"
                       style={{

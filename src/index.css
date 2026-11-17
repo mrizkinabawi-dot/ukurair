@@ -1243,13 +1243,6 @@ td {
   }
 
   /* 7. Modal Pop-up Responsif di HP */
-  .modal-detail-box {
-    width: 96% !important;
-    max-width: 96% !important;
-    height: 88vh !important;
-    border-radius: 12px !important;
-  }
-
   .modal-notif-box {
     width: 96% !important;
     max-width: 96% !important;
@@ -2157,4 +2150,250 @@ td {
 }
 .mobile-exit-toast {
   display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MODAL DETAIL GRAFIK RESPONSIF (DESKTOP & SMARTPHONE MOBILE)
+   ═══════════════════════════════════════════════════════════════════════ */
+.modal-detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1050;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.modal-detail-box {
+  background: #1e293b;
+  width: 94%;
+  max-width: 1250px;
+  height: 84vh;
+  max-height: 86vh;
+  border-radius: 16px;
+  border: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+}
+
+.modal-detail-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #334155;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(15, 23, 42, 0.75);
+  flex-shrink: 0;
+}
+
+.modal-detail-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-detail-title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.modal-detail-title {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.modal-detail-close-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #94a3b8;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.modal-detail-close-btn:hover {
+  color: #ffffff;
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+  transform: scale(1.05);
+}
+
+.modal-detail-badges-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.modal-detail-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+}
+
+.modal-detail-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.modal-detail-date-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-secondary);
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid #475569;
+}
+
+.modal-detail-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.modal-detail-zoom-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-secondary);
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid #475569;
+  gap: 3px;
+}
+
+.modal-detail-export-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  transition: background 0.15s;
+}
+
+.modal-detail-export-btn:hover {
+  background: #059669;
+}
+
+.modal-detail-chart-body {
+  flex: 1;
+  padding: 12px 0 8px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+}
+
+/* ─── Tampilan Khusus Smartphone / HP (max-width: 768px) ─── */
+@media (max-width: 768px) {
+  .modal-detail-overlay {
+    padding: 6px !important;
+    align-items: flex-end !important;
+    padding-bottom: calc(58px + 6px) !important; /* Di atas Bilah Navigasi Bawah HP */
+    z-index: 1050 !important;
+  }
+
+  .modal-detail-box {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: calc(100vh - 72px) !important;
+    border-radius: 18px 18px 10px 10px !important;
+    box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.85) !important;
+  }
+
+  .modal-detail-header {
+    padding: 10px 12px !important;
+    gap: 6px !important;
+    max-height: 48vh !important;
+    overflow-y: auto !important;
+  }
+
+  .modal-detail-title {
+    font-size: 0.96rem !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+  }
+
+  .modal-detail-close-btn {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .modal-detail-badges-row {
+    gap: 5px !important;
+  }
+
+  .modal-detail-legend-row {
+    gap: 8px !important;
+    font-size: 0.68rem !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    padding-bottom: 2px !important;
+  }
+
+  .modal-detail-controls-row {
+    gap: 6px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .modal-detail-date-filter {
+    padding: 4px 8px !important;
+    justify-content: space-between !important;
+  }
+
+  .modal-detail-action-buttons {
+    justify-content: space-between !important;
+    gap: 6px !important;
+  }
+
+  .modal-detail-export-btn {
+    padding: 5px 10px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .modal-detail-chart-body {
+    min-height: 250px !important;
+    height: 270px !important;
+    flex: none !important;
+    padding: 4px 0 !important;
+  }
 }

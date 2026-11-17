@@ -8070,240 +8070,271 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
 
       {/* Detailed Graphic Modal (Bisa dibuka oleh Admin maupun User biasa di Peta/Dashboard) */}
       {detailModalDevice && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' }}>
-          <div className="animate-fade-in modal-detail-box" style={{ background: '#1e293b', width: '92%', maxWidth: '1250px', height: '82vh', borderRadius: '16px', border: '1px solid #334155', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 50px rgba(0,0,0,0.8)' }}>
-            <div style={{ padding: '20px 30px', borderBottom: '1px solid #334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <h2 style={{ margin: 0, color: '#f8fafc', fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <BarChart3 size={24} color="#38bdf8" /> Detail Grafik: {detailModalDevice.name}
-                  </h2>
-                  {(() => {
-                    const modalDev = data.find(d => d.id === detailModalDevice.id) || detailModalDevice;
-                    const modalRate = calculateWaterRiseRate(chartData[detailModalDevice.id] || [], null, modalDev?.water_level);
-                    return (
+        <div className="modal-detail-overlay" onClick={() => setDetailModalDevice(null)}>
+          <div
+            className="animate-fade-in modal-detail-box"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-detail-header">
+              {/* Baris 1: Judul & Tombol Tutup X */}
+              <div className="modal-detail-top-row">
+                <div className="modal-detail-title-wrap">
+                  <BarChart3 size={20} color="#38bdf8" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <h3 className="modal-detail-title">
+                    Detail Grafik: {detailModalDevice.name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  className="modal-detail-close-btn"
+                  onClick={() => setDetailModalDevice(null)}
+                  title="Tutup Grafik (Kembali)"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Baris 2: Badges (Laju Kenaikan, Cuaca, AI, IP/MAC) */}
+              <div className="modal-detail-badges-row">
+                {(() => {
+                  const modalDev = data.find(d => d.id === detailModalDevice.id) || detailModalDevice;
+                  const modalRate = calculateWaterRiseRate(chartData[detailModalDevice.id] || [], null, modalDev?.water_level);
+                  return (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '3px 9px',
+                        borderRadius: '9999px',
+                        fontSize: '0.73rem',
+                        fontWeight: 700,
+                        background: modalRate.bg,
+                        color: modalRate.color,
+                        border: `1px solid ${modalRate.border}`,
+                        boxShadow: modalRate.isExtreme ? '0 0 10px rgba(239, 68, 68, 0.4)' : 'none',
+                        animation: modalRate.isExtreme ? 'pulse-alert 1.5s infinite' : 'none'
+                      }}
+                    >
+                      {modalRate.badge}
+                    </span>
+                  );
+                })()}
+
+                {/* Informasi Jaringan Teknis (IP & MAC) khusus untuk ADMIN */}
+                {isAdminUser && (() => {
+                  const modalDev = data.find(d => d.id === detailModalDevice.id) || detailModalDevice;
+                  const devIp = modalDev?.ip;
+                  const devMac = modalDev?.mac;
+                  if (!devIp && !devMac) return null;
+                  return (
+                    <>
+                      {devIp && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.73rem', fontFamily: 'monospace' }} title="IP Address ESP32 (Hanya Admin)">
+                          <Wifi size={12} /> {devIp}
+                        </span>
+                      )}
+                      {devMac && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(167, 139, 250, 0.12)', color: '#a78bfa', border: '1px solid rgba(167, 139, 250, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.73rem', fontFamily: 'monospace' }} title="MAC Address ESP32 (Hanya Admin)">
+                          <Cpu size={12} /> {devMac}
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {(() => {
+                  const modalDev = data.find(d => d.id === detailModalDevice.id) || detailModalDevice;
+                  const weather = deviceWeather[detailModalDevice.id] || { label: 'Cerah Berawan', icon: '⛅', isRain: false, isHeavy: false, temp: 30, humidity: 80, precipitation: 0 };
+                  const modalRate = calculateWaterRiseRate(chartData[detailModalDevice.id] || [], null, modalDev?.water_level);
+                  const aiEval = evaluateAiSituation(modalDev?.water_level, modalRate, weather);
+
+                  return (
+                    <>
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          background: 'rgba(30, 41, 59, 0.8)',
+                          border: '1px solid #475569',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          fontSize: '0.73rem',
+                          color: '#cbd5e1'
+                        }}
+                        title={`Radar: ${weather.label}, Suhu ${weather.temp || 30}°C, Hujan ${weather.precipitation || 0} mm/j`}
+                      >
+                        <span>{weather.icon}</span> {weather.temp ? `${weather.temp}°C` : ''} {weather.label} {weather.precipitation > 0 ? `(${weather.precipitation} mm)` : ''}
+                      </span>
+
                       <span
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '5px',
-                          padding: '3px 10px',
+                          background: aiEval.bg,
+                          color: aiEval.color,
+                          border: `1px solid ${aiEval.border}`,
+                          padding: '2px 8px',
                           borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          background: modalRate.bg,
-                          color: modalRate.color,
-                          border: `1px solid ${modalRate.border}`,
-                          boxShadow: modalRate.isExtreme ? '0 0 10px rgba(239, 68, 68, 0.4)' : 'none',
-                          animation: modalRate.isExtreme ? 'pulse-alert 1.5s infinite' : 'none'
+                          fontSize: '0.73rem',
+                          fontWeight: 700
                         }}
+                        title={aiEval.message}
                       >
-                        {modalRate.badge}
+                        <Bot size={12} /> {aiEval.badge}
                       </span>
-                    );
-                  })()}
-                  {/* Informasi Jaringan Teknis (IP & MAC) khusus untuk ADMIN */}
-                  {isAdminUser && (() => {
-                    const modalDev = data.find(d => d.id === detailModalDevice.id) || detailModalDevice;
-                    const devIp = modalDev?.ip;
-                    const devMac = modalDev?.mac;
-                    if (!devIp && !devMac) return null;
-                    return (
-                      <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', marginLeft: '5px' }}>
-                        {devIp && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'monospace' }} title="IP Address ESP32 (Hanya Admin)">
-                            <Wifi size={13} /> {devIp}
-                          </span>
-                        )}
-                        {devMac && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'rgba(167, 139, 250, 0.12)', color: '#a78bfa', border: '1px solid rgba(167, 139, 250, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'monospace' }} title="MAC Address ESP32 (Hanya Admin)">
-                            <Cpu size={13} /> {devMac}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  {(() => {
-                    const modalDev = data.find(d => d.id === detailModalDevice.id) || detailModalDevice;
-                    const weather = deviceWeather[detailModalDevice.id] || { label: 'Cerah Berawan', icon: '⛅', isRain: false, isHeavy: false, temp: 30, humidity: 80, precipitation: 0 };
-                    const modalRate = calculateWaterRiseRate(chartData[detailModalDevice.id] || [], null, modalDev?.water_level);
-                    const aiEval = evaluateAiSituation(modalDev?.water_level, modalRate, weather);
-
-                    return (
-                      <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', marginLeft: '5px', flexWrap: 'wrap' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            background: 'rgba(30, 41, 59, 0.8)',
-                            border: '1px solid #475569',
-                            padding: '2px 8px',
-                            borderRadius: '6px',
-                            fontSize: '0.75rem',
-                            color: '#cbd5e1'
-                          }}
-                          title={`Radar: ${weather.label}, Suhu ${weather.temp || 30}°C, Hujan ${weather.precipitation || 0} mm/j`}
-                        >
-                          <span>{weather.icon}</span> {weather.temp ? `${weather.temp}°C` : ''} {weather.label} {weather.precipitation > 0 ? `(${weather.precipitation} mm)` : ''}
-                        </span>
-
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            background: aiEval.bg,
-                            color: aiEval.color,
-                            border: `1px solid ${aiEval.border}`,
-                            padding: '2px 8px',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700
-                          }}
-                          title={aiEval.message}
-                        >
-                          <Bot size={13} /> {aiEval.badge}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                </div>
-                {/* Indikator Ambang Batas Siaga 1 - 4 */}
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginTop: '6px', fontSize: '0.75rem' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981' }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} /> Aman (&lt; 10 cm)
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#38bdf8' }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 6px #38bdf8' }} /> Siaga 1 (10 - 24 cm)
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f59e0b' }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b' }} /> Siaga 2 (25 - 49 cm)
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f97316' }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', boxShadow: '0 0 6px #f97316' }} /> Siaga 3 (50 - 74 cm)
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444' }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444' }} /> Siaga 4 (75 - 100 cm)
-                  </span>
-                </div>
+                    </>
+                  );
+                })()}
               </div>
-              <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+
+              {/* Baris 3: Indikator Ambang Batas Siaga 1 - 4 */}
+              <div className="modal-detail-legend-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#10b981' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981', flexShrink: 0 }} /> Aman (&lt; 10 cm)
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#38bdf8' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#38bdf8', boxShadow: '0 0 6px #38bdf8', flexShrink: 0 }} /> Siaga 1 (10 - 24 cm)
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f59e0b' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f59e0b', boxShadow: '0 0 6px #f59e0b', flexShrink: 0 }} /> Siaga 2 (25 - 49 cm)
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#f97316' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#f97316', boxShadow: '0 0 6px #f97316', flexShrink: 0 }} /> Siaga 3 (50 - 74 cm)
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#ef4444' }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4444', boxShadow: '0 0 6px #ef4444', flexShrink: 0 }} /> Siaga 4 (75 - 100 cm)
+                </span>
+              </div>
+
+              {/* Baris 4: Kontrol Filter Tanggal & Zoom & Ekspor */}
+              <div className="modal-detail-controls-row">
                 {/* Filter Tanggal & Waktu */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'var(--bg-secondary)', padding: '5px 15px', borderRadius: '8px', border: '1px solid #475569' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#94a3b8', marginRight: '5px' }}>Filter:</span>
+                <div className="modal-detail-date-filter">
+                  <span style={{ fontSize: '0.78rem', color: '#94a3b8', marginRight: '4px' }}>Filter:</span>
                   <button
+                    type="button"
                     onClick={() => {
                       if (!chartDateFilter) return;
                       const d = new Date(chartDateFilter);
                       d.setDate(d.getDate() - 1);
                       setChartDateFilter(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
                     }}
-                    style={{ background: 'transparent', color: '#38bdf8', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 5px' }}
+                    style={{ background: 'transparent', color: '#38bdf8', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px' }}
                     title="Hari Sebelumnya"
                   >
-                    <ArrowLeft size={16} />
+                    <ArrowLeft size={15} />
                   </button>
                   <input
                     type="date"
                     value={chartDateFilter}
                     onChange={e => setChartDateFilter(e.target.value)}
-                    style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', fontSize: '0.9rem' }}
+                    style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', fontSize: '0.82rem' }}
                   />
                   <button
+                    type="button"
                     onClick={() => {
                       if (!chartDateFilter) return;
                       const d = new Date(chartDateFilter);
                       d.setDate(d.getDate() + 1);
                       setChartDateFilter(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
                     }}
-                    style={{ background: 'transparent', color: '#38bdf8', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 5px' }}
+                    style={{ background: 'transparent', color: '#38bdf8', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '0 4px' }}
                     title="Hari Berikutnya"
                   >
-                    <ArrowRight size={16} />
+                    <ArrowRight size={15} />
                   </button>
                   <input
                     type="time"
                     value={chartTimeFilter}
                     onChange={e => setChartTimeFilter(e.target.value)}
-                    style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', fontSize: '0.9rem', borderLeft: '1px solid #475569', paddingLeft: '10px' }}
+                    style={{ background: 'transparent', color: 'white', border: 'none', outline: 'none', fontSize: '0.82rem', borderLeft: '1px solid #475569', paddingLeft: '8px' }}
                   />
                 </div>
 
-                {/* Pengatur Rasio Skala Jam (Zoom) */}
-                <div style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--bg-secondary)', padding: '3px', borderRadius: '8px', border: '1px solid #475569', gap: '3px' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#94a3b8', padding: '0 6px', fontWeight: 600 }}>Rasio:</span>
+                {/* Pengatur Rasio Skala Jam (Zoom) & Ekspor Excel */}
+                <div className="modal-detail-action-buttons">
+                  <div className="modal-detail-zoom-pill">
+                    <span style={{ fontSize: '0.72rem', color: '#94a3b8', padding: '0 4px', fontWeight: 600 }}>Rasio:</span>
+                    <button
+                      type="button"
+                      onClick={() => setChartZoomMode('fit')}
+                      title="Pas 1 Layar Penuh (00:00 - 24:00 langsung terlihat tanpa scroll)"
+                      style={{
+                        background: chartZoomMode === 'fit' ? 'var(--accent)' : 'transparent',
+                        color: chartZoomMode === 'fit' ? '#0f172a' : '#cbd5e1',
+                        border: 'none',
+                        borderRadius: '5px',
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      Pas Layar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartZoomMode('compact')}
+                      title="Rasio 10 Menit per Titik (Nyaman discroll)"
+                      style={{
+                        background: chartZoomMode === 'compact' ? 'var(--accent)' : 'transparent',
+                        color: chartZoomMode === 'compact' ? '#0f172a' : '#cbd5e1',
+                        border: 'none',
+                        borderRadius: '5px',
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      10 Menit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setChartZoomMode('wide')}
+                      title="Mode Lebar Renggang"
+                      style={{
+                        background: chartZoomMode === 'wide' ? 'var(--accent)' : 'transparent',
+                        color: chartZoomMode === 'wide' ? '#0f172a' : '#cbd5e1',
+                        border: 'none',
+                        borderRadius: '5px',
+                        padding: '3px 8px',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      Lebar
+                    </button>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => setChartZoomMode('fit')}
-                    title="Pas 1 Layar Penuh (00:00 - 24:00 langsung terlihat tanpa scroll)"
-                    style={{
-                      background: chartZoomMode === 'fit' ? 'var(--accent)' : 'transparent',
-                      color: chartZoomMode === 'fit' ? '#0f172a' : '#cbd5e1',
-                      border: 'none',
-                      borderRadius: '5px',
-                      padding: '4px 10px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
+                    onClick={() => handleExportAllData(detailModalDevice.id)}
+                    className="modal-detail-export-btn"
                   >
-                    Pas Layar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChartZoomMode('compact')}
-                    title="Rasio 10 Menit per Titik (Nyaman discroll)"
-                    style={{
-                      background: chartZoomMode === 'compact' ? 'var(--accent)' : 'transparent',
-                      color: chartZoomMode === 'compact' ? '#0f172a' : '#cbd5e1',
-                      border: 'none',
-                      borderRadius: '5px',
-                      padding: '4px 10px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    10 Menit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChartZoomMode('wide')}
-                    title="Mode Lebar Renggang"
-                    style={{
-                      background: chartZoomMode === 'wide' ? 'var(--accent)' : 'transparent',
-                      color: chartZoomMode === 'wide' ? '#0f172a' : '#cbd5e1',
-                      border: 'none',
-                      borderRadius: '5px',
-                      padding: '4px 10px',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    Lebar
+                    <Download size={14} /> Ekspor Excel
                   </button>
                 </div>
-
-                <button onClick={() => handleExportAllData(detailModalDevice.id)} style={{ background: '#10b981', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
-                  <Download size={18} /> Ekspor Excel
-                </button>
-                <X size={32} color="#94a3b8" style={{ cursor: 'pointer', marginLeft: '10px' }} onClick={() => setDetailModalDevice(null)} />
               </div>
             </div>
-            <div style={{ flex: 1, padding: '20px 0', overflowX: 'auto', overflowY: 'hidden' }}>
+
+            {/* Area Grafik Responsif */}
+            <div className="modal-detail-chart-body">
               <div style={{
                 width: chartZoomMode === 'fit' ? '100%' : chartZoomMode === 'compact' ? '1400px' : '2600px',
                 minWidth: chartZoomMode === 'fit' ? '100%' : chartZoomMode === 'compact' ? '1400px' : '2600px',
                 height: '100%',
-                padding: '0 25px 0 10px'
+                padding: '0 16px 0 0'
               }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={detailChartData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
+                  <AreaChart data={detailChartData} margin={{ top: 15, right: 15, left: -15, bottom: 20 }}>
                     <defs>
                       <linearGradient id="colorWaterDetail" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.6} />
@@ -8325,9 +8356,15 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                       }}
                       stroke="#94a3b8"
                       fontSize={11}
-                      tickMargin={12}
+                      tickMargin={8}
                     />
-                    <YAxis stroke="#94a3b8" fontSize={12} tickMargin={10} domain={[0, 100]} />
+                    <YAxis
+                      stroke="#94a3b8"
+                      fontSize={11}
+                      tickMargin={4}
+                      domain={[0, 100]}
+                      width={35}
+                    />
                     <Tooltip
                       content={<CustomChartTooltip history={chartData[detailModalDevice.id]} />}
                       animationDuration={80}

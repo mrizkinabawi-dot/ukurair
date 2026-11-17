@@ -8334,7 +8334,7 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                 padding: '0 16px 0 0'
               }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={detailChartData} margin={{ top: 15, right: 15, left: -15, bottom: 20 }}>
+                  <AreaChart data={detailChartData} margin={{ top: 12, right: 15, left: -15, bottom: 24 }}>
                     <defs>
                       <linearGradient id="colorWaterDetail" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.6} />

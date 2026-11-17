@@ -2024,26 +2024,26 @@ td {
 
   /* Modal Edit Range di HP */
   .edit-range-modal-overlay {
-    padding: 8px !important;
-    align-items: flex-end !important;
+    padding: 8px 8px 74px 8px !important;
+    align-items: center !important;
   }
 
   .edit-range-modal-card {
-    max-height: 88vh !important;
-    border-radius: 20px 20px 10px 10px !important;
-    margin-bottom: env(safe-area-inset-bottom, 0px) !important;
+    max-height: calc(100vh - 90px) !important;
+    border-radius: 16px !important;
+    margin-bottom: 0 !important;
   }
 
   /* Modal Kontrol Manual di HP */
   .manual-control-modal-overlay {
-    padding: 8px !important;
-    align-items: flex-end !important;
+    padding: 8px 8px 74px 8px !important;
+    align-items: center !important;
   }
 
   .manual-control-modal-card {
-    max-height: 88vh !important;
-    border-radius: 20px 20px 10px 10px !important;
-    margin-bottom: env(safe-area-inset-bottom, 0px) !important;
+    max-height: calc(100vh - 90px) !important;
+    border-radius: 16px !important;
+    margin-bottom: 0 !important;
   }
 
   /* Banner Darurat di HP */
@@ -2067,12 +2067,12 @@ td {
     left: 0 !important;
     right: 0 !important;
     height: 58px !important;
-    background: rgba(15, 23, 42, 0.96) !important;
+    background: rgba(15, 23, 42, 0.98) !important;
     backdrop-filter: blur(14px) !important;
     -webkit-backdrop-filter: blur(14px) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-    box-shadow: 0 -6px 25px rgba(0, 0, 0, 0.5) !important;
-    z-index: 1004 !important;
+    border-top: 1px solid rgba(56, 189, 248, 0.25) !important;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.7) !important;
+    z-index: 1200 !important;
     padding-bottom: env(safe-area-inset-bottom, 0px) !important;
     justify-content: space-around !important;
     align-items: center !important;
@@ -2324,19 +2324,19 @@ td {
 /* ─── Tampilan Khusus Smartphone / HP (max-width: 768px) ─── */
 @media (max-width: 768px) {
   .modal-detail-overlay {
-    padding: 6px !important;
-    align-items: flex-end !important;
-    padding-bottom: calc(58px + 6px) !important; /* Di atas Bilah Navigasi Bawah HP */
+    padding: 8px 8px 74px 8px !important; /* Ruang 74px agar bilah navigasi bawah tetap bebas & terlihat */
+    align-items: center !important; /* Mengambang seimbang di tengah, TIDAK nempel ke bagian bawah */
+    justify-content: center !important;
     z-index: 1050 !important;
   }
 
   .modal-detail-box {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: 480px !important;
     height: auto !important;
-    max-height: calc(100vh - 72px) !important;
-    border-radius: 18px 18px 10px 10px !important;
-    box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.85) !important;
+    max-height: calc(100vh - 88px) !important; /* Tidak pernah menabrak bilah navigasi bawah */
+    border-radius: 16px !important; /* Membulat rapi di seluruh sudut */
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.85) !important;
   }
 
   .modal-detail-header {
@@ -2391,8 +2391,8 @@ td {
   }
 
   .modal-detail-chart-body {
-    min-height: 250px !important;
-    height: 270px !important;
+    min-height: 220px !important;
+    height: 240px !important;
     flex: none !important;
     padding: 4px 0 !important;
   }

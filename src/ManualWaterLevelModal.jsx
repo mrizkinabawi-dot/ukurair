@@ -65,7 +65,7 @@ export const ManualWaterLevelModal = ({
   }, [selectedDeviceId]);
 
   // Kalkulasi status ketinggian air real-time
-  const statusInfo = getWaterStatus(level);
+  const statusInfo = getWaterStatus(level === '' ? 0 : Number(level));
 
   // Penanganan simpan ke Firebase RTDB
   const handleSave = async (forceOff = false) => {
@@ -213,7 +213,7 @@ export const ManualWaterLevelModal = ({
             onClick={() => {
               const nextVal = !isManualOn;
               setIsManualOn(nextVal);
-              if (nextVal && level === 0) setLevel(35);
+              if (nextVal && (level === 0 || level === '')) setLevel(35);
             }}
             style={{
               display: 'flex',
@@ -314,7 +314,7 @@ export const ManualWaterLevelModal = ({
                       color: statusInfo.color,
                       lineHeight: 1
                     }}>
-                      {level}
+                      {level === '' ? 0 : level}
                     </span>
                     <span style={{ fontSize: '1rem', fontWeight: 700, color: '#94a3b8' }}>cm</span>
                   </div>
@@ -356,7 +356,7 @@ export const ManualWaterLevelModal = ({
                   min="0"
                   max="100"
                   step="1"
-                  value={level}
+                  value={level === '' ? 0 : level}
                   onChange={(e) => setLevel(Number(e.target.value))}
                   style={{
                     width: '100%',
@@ -397,14 +397,29 @@ export const ManualWaterLevelModal = ({
               }}>
                 <span style={{ fontSize: '0.74rem', color: '#cbd5e1' }}>Ketik Angka Pasti (cm):</span>
                 <input
-                  type="number"
-                  min="0"
-                  max="100"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="0"
                   value={level}
                   onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === '') setLevel(0);
-                    else setLevel(Math.min(100, Math.max(0, parseInt(val, 10) || 0)));
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    if (raw === '') {
+                      setLevel('');
+                      return;
+                    }
+                    const cleaned = raw.length > 1 ? raw.replace(/^0+/, '') || '0' : raw;
+                    const num = parseInt(cleaned, 10);
+                    if (isNaN(num)) {
+                      setLevel('');
+                    } else {
+                      setLevel(Math.min(100, Math.max(0, num)));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (level === '' || isNaN(level)) {
+                      setLevel(0);
+                    }
                   }}
                   style={{
                     width: '65px',
@@ -429,7 +444,7 @@ export const ManualWaterLevelModal = ({
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', gap: '6px' }}>
                   {presets.map(p => {
-                    const isSelected = level === p.level;
+                    const isSelected = (level === '' ? 0 : Number(level)) === p.level;
                     return (
                       <button
                         key={p.level}
@@ -615,14 +630,15 @@ export const DeviceDetailManualControlWidget = ({
     }
   }, [device.id, device.manual_control, device.water_level]);
 
-  const statusInfo = getWaterStatus(level);
+  const statusInfo = getWaterStatus(level === '' ? 0 : Number(level));
 
   const handleApply = async (manualState, targetLevel) => {
     setIsSaving(true);
     setStatusMsg('');
+    const finalLevel = targetLevel === '' || isNaN(Number(targetLevel)) ? 0 : Math.min(100, Math.max(0, Math.round(Number(targetLevel))));
     try {
-      await onSaveManual(device.id, manualState, targetLevel);
-      setStatusMsg(manualState ? `✅ Disimpan: ${targetLevel} cm` : '✅ Mode OFF Aktif');
+      await onSaveManual(device.id, manualState, finalLevel);
+      setStatusMsg(manualState ? `✅ Disimpan: ${finalLevel} cm` : '✅ Mode OFF Aktif');
       setTimeout(() => setStatusMsg(''), 2500);
     } catch (e) {
       setStatusMsg('⚠️ Gagal: ' + (e?.message || 'Error'));
@@ -666,7 +682,7 @@ export const DeviceDetailManualControlWidget = ({
           type="button"
           onClick={() => {
             setIsManualOn(true);
-            handleApply(true, level);
+            handleApply(true, level === '' ? 0 : level);
           }}
           style={{
             flex: 1,
@@ -719,7 +735,44 @@ export const DeviceDetailManualControlWidget = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Ketinggian:</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <strong style={{ fontSize: '1rem', color: statusInfo.color }}>{level} cm</strong>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="0"
+                value={level}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                  if (raw === '') {
+                    setLevel('');
+                    return;
+                  }
+                  const cleaned = raw.length > 1 ? raw.replace(/^0+/, '') || '0' : raw;
+                  const num = parseInt(cleaned, 10);
+                  const validNum = isNaN(num) ? 0 : Math.min(100, Math.max(0, num));
+                  setLevel(validNum);
+                  handleApply(true, validNum);
+                }}
+                onBlur={() => {
+                  if (level === '' || isNaN(level)) {
+                    setLevel(0);
+                    handleApply(true, 0);
+                  }
+                }}
+                style={{
+                  width: '45px',
+                  background: '#1e293b',
+                  border: '1px solid #475569',
+                  borderRadius: '5px',
+                  color: statusInfo.color,
+                  padding: '1px 4px',
+                  fontSize: '0.85rem',
+                  fontWeight: 800,
+                  textAlign: 'center',
+                  outline: 'none'
+                }}
+              />
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8' }}>cm</span>
               <span style={{ fontSize: '0.65rem', padding: '1px 5px', borderRadius: '4px', background: statusInfo.bg, color: statusInfo.color, border: `1px solid ${statusInfo.border}`, fontWeight: 700 }}>
                 {statusInfo.label}
               </span>
@@ -731,10 +784,10 @@ export const DeviceDetailManualControlWidget = ({
             min="0"
             max="100"
             step="1"
-            value={level}
+            value={level === '' ? 0 : level}
             onChange={(e) => setLevel(Number(e.target.value))}
-            onMouseUp={() => handleApply(true, level)}
-            onTouchEnd={() => handleApply(true, level)}
+            onMouseUp={() => handleApply(true, level === '' ? 0 : level)}
+            onTouchEnd={() => handleApply(true, level === '' ? 0 : level)}
             style={{ width: '100%', accentColor: statusInfo.color, cursor: 'pointer', marginBottom: '8px' }}
           />
 
@@ -746,29 +799,32 @@ export const DeviceDetailManualControlWidget = ({
               { l: 40, label: '40cm' },
               { l: 65, label: '65cm' },
               { l: 85, label: '85cm' }
-            ].map(p => (
-              <button
-                key={p.l}
-                type="button"
-                onClick={() => {
-                  setLevel(p.l);
-                  handleApply(true, p.l);
-                }}
-                style={{
-                  flex: 1,
-                  padding: '3px 0',
-                  borderRadius: '4px',
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  background: level === p.l ? 'rgba(56, 189, 248, 0.25)' : 'rgba(30, 41, 59, 0.6)',
-                  border: `1px solid ${level === p.l ? '#38bdf8' : '#334155'}`,
-                  color: level === p.l ? '#38bdf8' : '#cbd5e1'
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
+            ].map(p => {
+              const isSelected = (level === '' ? 0 : Number(level)) === p.l;
+              return (
+                <button
+                  key={p.l}
+                  type="button"
+                  onClick={() => {
+                    setLevel(p.l);
+                    handleApply(true, p.l);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '3px 0',
+                    borderRadius: '4px',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    background: isSelected ? 'rgba(56, 189, 248, 0.25)' : 'rgba(30, 41, 59, 0.6)',
+                    border: `1px solid ${isSelected ? '#38bdf8' : '#334155'}`,
+                    color: isSelected ? '#38bdf8' : '#cbd5e1'
+                  }}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
           </div>
         </>
       )}

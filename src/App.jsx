@@ -2073,7 +2073,9 @@ const App = () => {
   // Generate tick jam yang rapi (00:00, 01:00, 02:00 ...) tanpa desimal aneh
   const dayTicks = useMemo(() => {
     if (!chartDateFilter) return undefined;
-    const startOfDay = new Date(chartDateFilter).setHours(0, 0, 0, 0);
+    const [yr, mo, da] = chartDateFilter.split('-').map(Number);
+    if (!yr || !mo || !da) return undefined;
+    const startOfDay = new Date(yr, mo - 1, da, 0, 0, 0, 0).getTime();
     const ticks = [];
     const stepHours = chartZoomMode === 'fit' ? 2 : 1;
     for (let h = 0; h <= 24; h += stepHours) {
@@ -2308,25 +2310,48 @@ const App = () => {
     };
   }, [handleSmartBack]);
 
-  // Smooth continuous interpolated data for Detail Modal Chart (disesuaikan untuk sensor 10 menit)
-  const detailChartData = useMemo(() => {
-    if (!detailModalDevice || !chartData[detailModalDevice.id]) return [];
-    const raw = chartData[detailModalDevice.id];
-    if (!raw || raw.length === 0) return [];
+  // Helper fungsi untuk menghasilkan deret data grafik continuous untuk tanggal yang dipilih
+  // Menjaga kontinuitas ketinggian air antar hari (carry-over 00:00) agar jika air stabil dari kemarin
+  // ke hari berikutnya, grafik tetap membaca data dan tidak anjlok ke 0 cm atau kosong.
+  const buildContinuousDayChartData = useCallback((rawList = [], liveDev = null, dateStr = '', devEff = null) => {
+    if (!dateStr) return rawList;
 
-    if (!chartDateFilter) return raw;
+    const [yr, mo, da] = dateStr.split('-').map(Number);
+    if (!yr || !mo || !da) return rawList;
 
-    const startOfDay = new Date(chartDateFilter).setHours(0, 0, 0, 0);
-    const endOfDay = new Date(chartDateFilter).setHours(23, 59, 59, 999);
+    const startOfDay = new Date(yr, mo - 1, da, 0, 0, 0, 0).getTime();
+    const endOfDay = new Date(yr, mo - 1, da, 23, 59, 59, 999).getTime();
+    const now = Date.now();
+    const isToday = now >= startOfDay && now <= endOfDay;
+    const isFuture = startOfDay > now;
+    const effectiveEnd = isToday ? now : endOfDay;
 
-    const dayRecords = raw
-      .filter(item => item.sortTs >= startOfDay && item.sortTs <= endOfDay)
-      .sort((a, b) => a.sortTs - b.sortTs);
+    if (isFuture) return [];
 
-    if (dayRecords.length === 0) return [];
+    const raw = [...rawList].sort((a, b) => (a.sortTs || 0) - (b.sortTs || 0));
 
-    const result = [];
-    const STEP_MS = 5 * 60 * 1000; // Interpolasi 5 menit per langkah agar pas dan ringan untuk sensor 10 menit
+    // 1. Cari titik data terakhir SEBELUM hari ini untuk carry-over level air saat pergantian hari (00:00)
+    const priorRecords = raw.filter(item => (item.sortTs || 0) < startOfDay);
+    const lastPrior = priorRecords.length > 0 ? priorRecords[priorRecords.length - 1] : null;
+
+    // Titik data di dalam hari yang dipilih
+    let dayRecords = raw
+      .filter(item => (item.sortTs || 0) >= startOfDay && (item.sortTs || 0) <= effectiveEnd)
+      .sort((a, b) => (a.sortTs || 0) - (b.sortTs || 0));
+
+    const eff = devEff || (liveDev ? getDeviceEffectiveData(liveDev) : null);
+    const isOnline = eff ? eff.isOnline : (liveDev ? isDeviceOnline(liveDev) : false);
+    const liveLevel = eff ? eff.water_level : (liveDev && Number.isFinite(Number(liveDev.water_level)) ? Number(liveDev.water_level) : null);
+    const liveStatus = eff ? eff.status : (liveDev?.status || (liveLevel !== null ? getWaterStatus(liveLevel).status : 'AMAN'));
+
+    // Baseline level air pada pukul 00:00:
+    // Jika kemarin ada data, lanjutkan nilai kemarin (air tidak mendadak hilang/nol di 00:00).
+    // Jika tidak ada data kemarin tapi alat online saat ini, gunakan nilai saat ini.
+    // Jika tidak ada data sama sekali, gunakan 0.
+    const baselineLevel = lastPrior ? Number(lastPrior.water_level || 0) : ((isOnline && liveLevel !== null) ? liveLevel : 0);
+    const baselineStatus = lastPrior?.status || (lastPrior ? getWaterStatus(baselineLevel).status : (isOnline ? liveStatus : 'AMAN'));
+
+    const STEP_MS = 5 * 60 * 1000; // 5 menit per langkah interpolasi
 
     const createPoint = (ts, val, status) => {
       const d = new Date(ts);
@@ -2344,15 +2369,43 @@ const App = () => {
       };
     };
 
-    // 1. Fill from start of day to first record if gap > 1 min
-    const first = dayRecords[0];
-    if (first.sortTs - startOfDay > STEP_MS) {
-      for (let ts = startOfDay; ts < first.sortTs; ts += STEP_MS) {
-        result.push(createPoint(ts, 0, 'AMAN'));
+    // 2. Jika hari ini (isToday) dan alat online, pastikan titik live saat ini ada di grafik
+    if (isToday && isOnline && liveLevel !== null) {
+      const hasNowPoint = dayRecords.some(pt => Math.abs((pt.sortTs || 0) - now) < 45000);
+      if (!hasNowPoint) {
+        dayRecords.push(createPoint(now, liveLevel, liveStatus));
+        dayRecords.sort((a, b) => a.sortTs - b.sortTs);
       }
     }
 
-    // 2. Loop through records and interpolate gaps
+    // 3. JIKA dayRecords kosong (misal: sensor belum kirim log baru hari ini, atau air stabil terus sejak kemarin):
+    if (dayRecords.length === 0) {
+      if (lastPrior || (isOnline && liveLevel !== null)) {
+        const carryLevel = (isOnline && liveLevel !== null) ? liveLevel : baselineLevel;
+        const carryStatus = (isOnline && liveLevel !== null) ? liveStatus : baselineStatus;
+        const result = [];
+        for (let ts = startOfDay; ts <= effectiveEnd; ts += STEP_MS) {
+          result.push(createPoint(ts, carryLevel, carryStatus));
+        }
+        if (result.length === 0 || result[result.length - 1].sortTs < effectiveEnd) {
+          result.push(createPoint(effectiveEnd, carryLevel, carryStatus));
+        }
+        return result;
+      }
+      return [];
+    }
+
+    const result = [];
+
+    // 4. Sambungkan dari awal hari (00:00) ke titik pertama hari ini
+    const first = dayRecords[0];
+    if (first.sortTs - startOfDay > STEP_MS) {
+      for (let ts = startOfDay; ts < first.sortTs; ts += STEP_MS) {
+        result.push(createPoint(ts, baselineLevel, baselineStatus));
+      }
+    }
+
+    // 5. Interpolasi antar record di dalam hari
     for (let i = 0; i < dayRecords.length; i++) {
       const current = dayRecords[i];
       result.push(current);
@@ -2375,18 +2428,38 @@ const App = () => {
       }
     }
 
-    // 3. Sambungkan dari record terakhir sampai waktu sekarang (jangan isi 0 cm ke masa depan)
+    // 6. Sambungkan dari record terakhir sampai effectiveEnd (sekarang jika hari ini)
     const last = dayRecords[dayRecords.length - 1];
-    const now = Date.now();
-    const effectiveEnd = Math.min(endOfDay, now);
     if (effectiveEnd - last.sortTs > STEP_MS) {
+      const fillLevel = (isToday && isOnline && liveLevel !== null) ? liveLevel : last.water_level;
+      const fillStatus = (isToday && isOnline && liveLevel !== null) ? liveStatus : last.status;
       for (let ts = last.sortTs + STEP_MS; ts <= effectiveEnd; ts += STEP_MS) {
-        result.push(createPoint(ts, last.water_level, last.status));
+        result.push(createPoint(ts, fillLevel, fillStatus));
       }
     }
 
     return result;
-  }, [detailModalDevice, chartData, chartDateFilter]);
+  }, [getDeviceEffectiveData, isDeviceOnline]);
+
+  // Smooth continuous interpolated data for Detail Modal Chart (disesuaikan untuk sensor 10 menit)
+  const detailChartData = useMemo(() => {
+    if (!detailModalDevice) return [];
+    const devId = detailModalDevice.id;
+    const raw = chartData[devId] || [];
+    const liveDev = data.find(d => d.id === devId) || detailModalDevice;
+    const eff = getDeviceEffectiveData(liveDev);
+    return buildContinuousDayChartData(raw, liveDev, chartDateFilter, eff);
+  }, [detailModalDevice, chartData, chartDateFilter, data, currentTime, buildContinuousDayChartData, getDeviceEffectiveData]);
+
+  // Smooth continuous interpolated data for Sidebar Device Detail Chart
+  const sidebarChartData = useMemo(() => {
+    if (!selectedDevice) return [];
+    const devId = selectedDevice.id;
+    const raw = chartData[devId] || [];
+    const liveDev = data.find(d => d.id === devId) || selectedDevice;
+    const eff = getDeviceEffectiveData(liveDev);
+    return buildContinuousDayChartData(raw, liveDev, chartDateFilter, eff);
+  }, [selectedDevice, chartData, chartDateFilter, data, currentTime, buildContinuousDayChartData, getDeviceEffectiveData]);
 
   // 1. Firebase Auth Listener & Persistent Session Handler
   useEffect(() => {
@@ -2753,8 +2826,8 @@ const App = () => {
     }
   }, [user, view]);
 
-  const listenToDeviceHistory = (deviceId, dateFilterStr, timeFilterStr) => {
-    let historyRef = query(ref(db, `measurements/${deviceId}`), limitToLast(dateFilterStr ? 1000 : 300));
+  const listenToDeviceHistory = (deviceId) => {
+    let historyRef = query(ref(db, `measurements/${deviceId}`), limitToLast(1000));
     return onValue(historyRef, (snapshot) => {
       const val = snapshot.val();
       let list = [];
@@ -2772,28 +2845,27 @@ const App = () => {
         });
       }
 
-      // Pastikan titik data live saat ini (dari /dashboard) selalu ikut masuk ke grafik
+      // Pastikan titik data live saat ini (dari /dashboard) selalu ikut masuk ke riwayat
       const liveDev = data.find(d => d.id === deviceId);
-      if (liveDev && Number.isFinite(Number(liveDev.water_level))) {
-        const liveTs = liveDev.created_at || Date.now();
-        const alreadyHasPoint = list.some(pt => Math.abs((pt.sortTs || 0) - liveTs) < 45000);
-        if (!alreadyHasPoint) {
-          const d = new Date(liveTs);
-          list.push({
-            water_level: Number(liveDev.water_level),
-            status: liveDev.status || 'AMAN',
-            time: d.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
-            sortTs: liveTs,
-            created_at: d.toISOString()
-          });
+      if (liveDev) {
+        const eff = getDeviceEffectiveData(liveDev);
+        const liveLevel = eff.isOnline ? eff.water_level : (Number.isFinite(Number(liveDev.water_level)) ? Number(liveDev.water_level) : null);
+        if (liveLevel !== null && Number.isFinite(liveLevel)) {
+          // Jika alat online / mode manual aktif, titik live saat ini valid pada Date.now()
+          const liveTs = (eff.isOnline || liveDev.manual_control) ? Date.now() : (parseCreatedAt(liveDev.created_at) || Date.now());
+          const alreadyHasPoint = list.some(pt => Math.abs((pt.sortTs || 0) - liveTs) < 45000);
+          if (!alreadyHasPoint) {
+            const d = new Date(liveTs);
+            list.push({
+              water_level: liveLevel,
+              status: eff.status || liveDev.status || 'AMAN',
+              time: d.toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+              sortTs: liveTs,
+              created_at: d.toISOString(),
+              isLive: true
+            });
+          }
         }
-      }
-
-      if (dateFilterStr) {
-        const [yr, mo, da] = dateFilterStr.split('-').map(Number);
-        const start = new Date(yr, mo - 1, da, 0, 0, 0, 0).getTime();
-        const end = new Date(yr, mo - 1, da, 23, 59, 59, 999).getTime();
-        list = list.filter(item => item.sortTs >= start && item.sortTs <= end);
       }
 
       list.sort((a, b) => a.sortTs - b.sortTs);
@@ -2817,12 +2889,7 @@ const App = () => {
   useEffect(() => {
     const unsubs = [];
     historyDeviceIds.forEach(id => {
-      const isDetail = (detailModalDevice?.id === id) || (view === 'device-detail' && selectedDevice?.id === id);
-      unsubs.push(listenToDeviceHistory(
-        id,
-        isDetail ? chartDateFilter : null,
-        isDetail ? chartTimeFilter : null
-      ));
+      unsubs.push(listenToDeviceHistory(id));
     });
 
     return () => {
@@ -2833,7 +2900,7 @@ const App = () => {
     // Sengaja bergantung pada daftar ID (bukan objek data) agar listener tidak
     // dibuat ulang setiap kali nilai sensor berubah tiap beberapa detik.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, selectedDevice?.id, deviceIdsKey, chartDateFilter, chartTimeFilter, detailModalDevice?.id]);
+  }, [view, deviceIdsKey]);
 
   // Auth Actions
   const handleLogin = async (e) => {
@@ -5766,7 +5833,7 @@ const App = () => {
                   </div>
                   <div style={{ flex: 1, marginLeft: '-15px' }}>
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData[selectedDevice.id] || []}>
+                      <AreaChart data={sidebarChartData}>
                         <defs>
                           <linearGradient id="colorWater" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="var(--accent, #38bdf8)" stopOpacity={0.5} />
@@ -5802,30 +5869,43 @@ const App = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {chartData[selectedDevice.id] && [...chartData[selectedDevice.id]].reverse().map((log, idx) => {
-                          const d = new Date(log.sortTs || parseCreatedAt(log.created_at));
-                          return (
-                            <tr key={idx}>
-                              <td style={{ padding: '8px 4px', borderBottom: '1px solid #334155' }}>{d.toLocaleDateString()}</td>
-                              <td style={{ padding: '8px 4px', borderBottom: '1px solid #334155' }}>{d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                              <td style={{ padding: '8px 4px', borderBottom: '1px solid #334155' }}>{log.water_level} cm</td>
-                              <td style={{ padding: '8px 4px', borderBottom: '1px solid #334155' }}>
-                                {(() => {
-                                  const st = getWaterStatus(log.water_level, log.status);
-                                  return (
-                                    <span style={{ color: st.color, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.dotColor }} />
-                                      {st.label}
-                                    </span>
-                                  );
-                                })()}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {(() => {
+                          const devId = selectedDevice?.id;
+                          const raw = chartData[devId] || [];
+                          if (!raw.length) return null;
+                          let displayLogs = raw;
+                          if (chartDateFilter) {
+                            const [yr, mo, da] = chartDateFilter.split('-').map(Number);
+                            const startOfDay = new Date(yr, mo - 1, da, 0, 0, 0, 0).getTime();
+                            const endOfDay = new Date(yr, mo - 1, da, 23, 59, 59, 999).getTime();
+                            const dayLogs = raw.filter(log => (log.sortTs || 0) >= startOfDay && (log.sortTs || 0) <= endOfDay);
+                            if (dayLogs.length > 0) displayLogs = dayLogs;
+                          }
+                          return [...displayLogs].reverse().slice(0, 50).map((log, idx) => {
+                            const d = new Date(log.sortTs || parseCreatedAt(log.created_at));
+                            return (
+                              <tr key={idx}>
+                                <td style={{ padding: '8px 4px', borderBottom: '1px solid #334155' }}>{d.toLocaleDateString()}</td>
+                                <td style={{ padding: '8px 4px', borderBottom: '1px solid #334155' }}>{d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                                <td style={{ padding: '8px 4px', borderBottom: '1px solid #334155' }}>{log.water_level} cm</td>
+                                <td style={{ padding: '8px 4px', borderBottom: '1px solid #334155' }}>
+                                  {(() => {
+                                    const st = getWaterStatus(log.water_level, log.status);
+                                    return (
+                                      <span style={{ color: st.color, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: st.dotColor }} />
+                                        {st.label}
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
-                    {(!chartData[selectedDevice.id] || chartData[selectedDevice.id].length === 0) && (
+                    {(!sidebarChartData || sidebarChartData.length === 0) && (!chartData[selectedDevice.id] || chartData[selectedDevice.id].length === 0) && (
                       <p style={{ textAlign: 'center', margin: '20px 0', color: '#64748b', fontSize: '0.8rem' }}>Belum ada riwayat data.</p>
                     )}
                   </div>
@@ -8221,7 +8301,8 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                     type="button"
                     onClick={() => {
                       if (!chartDateFilter) return;
-                      const d = new Date(chartDateFilter);
+                      const [yr, mo, da] = chartDateFilter.split('-').map(Number);
+                      const d = new Date(yr, mo - 1, da);
                       d.setDate(d.getDate() - 1);
                       setChartDateFilter(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
                     }}
@@ -8241,7 +8322,8 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                     type="button"
                     onClick={() => {
                       if (!chartDateFilter) return;
-                      const d = new Date(chartDateFilter);
+                      const [yr, mo, da] = chartDateFilter.split('-').map(Number);
+                      const d = new Date(yr, mo - 1, da);
                       d.setDate(d.getDate() + 1);
                       setChartDateFilter(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
                     }}
@@ -8353,10 +8435,14 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                     <XAxis
                       dataKey="sortTs"
                       type="number"
-                      domain={[
-                        new Date(chartDateFilter).setHours(0, 0, 0, 0),
-                        new Date(chartDateFilter).setHours(24, 0, 0, 0)
-                      ]}
+                      domain={(() => {
+                        if (!chartDateFilter) return ['auto', 'auto'];
+                        const [yr, mo, da] = chartDateFilter.split('-').map(Number);
+                        if (!yr || !mo || !da) return ['auto', 'auto'];
+                        const s = new Date(yr, mo - 1, da, 0, 0, 0, 0).getTime();
+                        const e = new Date(yr, mo - 1, da, 24, 0, 0, 0).getTime();
+                        return [s, e];
+                      })()}
                       ticks={dayTicks}
                       tickFormatter={(tick) => {
                         const d = new Date(tick);
@@ -8390,7 +8476,11 @@ const String FIREBASE_HOST = "https://monitoring-ketinggian-air-1-default-rtdb.f
                     />
                     {chartTimeFilter && chartDateFilter && (
                       <ReferenceLine
-                        x={new Date(`${chartDateFilter}T${chartTimeFilter}`).getTime()}
+                        x={(() => {
+                          const [yr, mo, da] = chartDateFilter.split('-').map(Number);
+                          const [hh, mm] = chartTimeFilter.split(':').map(Number);
+                          return new Date(yr, mo - 1, da, hh || 0, mm || 0, 0, 0).getTime();
+                        })()}
                         stroke="#38bdf8"
                         strokeWidth={2}
                         strokeDasharray="3 3"
